@@ -245,9 +245,9 @@ class ExchangeRuntimeTest {
 
     submitter.close();
 
-    assertThatThrownBy(() -> submitter.submit(request))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("closed");
+    assertThatThrownBy(() -> submitter.submit(request).join())
+        .hasCauseInstanceOf(IllegalStateException.class)
+        .hasRootCauseMessage("exchange request submitter is closed");
   }
 
   private static final class TrackingGuard implements SingleWriterGuard {

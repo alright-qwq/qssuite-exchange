@@ -39,7 +39,10 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
   public CompletableFuture<SubmissionResult> submit(ExchangeMenuRequest request) {
     Objects.requireNonNull(request, "request");
     if (closed.get()) {
-      throw new IllegalStateException("exchange request submitter is closed");
+      // A confirmation racing an addon reload must never throw into the menu click handler:
+      // surface it as a failed future so the GUI can display the friendly failure message.
+      return CompletableFuture.failedFuture(
+          new IllegalStateException("exchange request submitter is closed"));
     }
     if (request.requestId() == null) {
       return CompletableFuture.failedFuture(
