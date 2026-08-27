@@ -124,6 +124,7 @@ public final class Main extends JavaPlugin implements Listener {
       runtime = null;
       runtimeFactory = null;
       mainListenerRegistered = false;
+      org.bukkit.event.HandlerList.unregisterAll((org.bukkit.event.Listener) this);
       ShutdownSequence.close(this::unregisterPlayerEntrypoints,
           () -> {
             if (failedRuntime != null) {
@@ -148,6 +149,7 @@ public final class Main extends JavaPlugin implements Listener {
       ExchangeRuntime activeRuntime = runtime;
       ExchangeRuntimeFactory activeFactory = runtimeFactory;
       mainListenerRegistered = false;
+      org.bukkit.event.HandlerList.unregisterAll((org.bukkit.event.Listener) this);
       ShutdownSequence.close(this::unregisterPlayerEntrypoints,
           () -> {
             if (activeRuntime != null) {
