@@ -83,6 +83,24 @@ public final class ExchangeViewService {
   }
 
   /**
+   * Hot-updates a market's display metadata (name, asset type, symbol, supply) so configuration
+   * changes appear in already-open views without a restart. The order book service and live
+   * security suppliers are preserved from the previous view.
+   */
+  public synchronized void updateMarketMetadata(String marketId, String displayName,
+      String assetType, String symbol, Long totalSupply) {
+    MarketView current = markets.get(marketId);
+    if (current == null) {
+      throw new IllegalArgumentException("unknown market view: " + marketId);
+    }
+    MarketView updated = new MarketView(current.marketId(), displayName, current.service(),
+        assetType, symbol, totalSupply, current.securityStatus(), current.issuedSupply());
+    Map<String, MarketView> updatedMarkets = new LinkedHashMap<>(markets);
+    updatedMarkets.put(marketId, updated);
+    this.markets = Map.copyOf(updatedMarkets);
+  }
+
+  /**
    * Hot-applies the GUI market refresh minimum interval. Existing player subscriptions pick up the
    * new pacing on their next published update without re-opening the view.
    */

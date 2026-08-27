@@ -55,6 +55,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -77,9 +78,11 @@ public final class ExchangeRuntimeFactory {
   private volatile ExchangeActionService actions;
   private volatile ExchangeViewService views;
   private volatile AdminExchangeService administration;
+  private volatile ScheduledExecutorService maintenance;
   /** Volatile scheduler settings re-read on every reload so they hot-apply without a restart. */
   private volatile int candleRetentionDays = 365;
   private volatile int reconciliationIntervalMinutes = 1440;
+  private volatile ScheduledFuture<?> reconciliationTask;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
     this.addon = java.util.Objects.requireNonNull(addon, "addon");
@@ -90,7 +93,6 @@ public final class ExchangeRuntimeFactory {
     Database database = database();
     this.database = database;
     database.writer().acquire();
-    ScheduledExecutorService maintenance = null;
     ScheduledExecutorService uiMaintenance = null;
     try {
       TableNames tables = new TableNames(quickShop.getDbPrefix());
@@ -169,7 +171,7 @@ public final class ExchangeRuntimeFactory {
     Bukkit.getPluginManager().registerEvents(new ContainerShopPolicyListener(registry), addon);
 
     AutoCloseable dispatcher = () -> {};
-    maintenance = Executors.newSingleThreadScheduledExecutor(
+    this.maintenance = Executors.newSingleThreadScheduledExecutor(
         Thread.ofPlatform().daemon(true).name("qs-exchange-maintenance-", 0).factory());
     // UI refreshes and view reads run on their own pool so a slow maintenance scan (detection,
     // reconciliation, candle purge) can never stall player GUI updates.
@@ -253,30 +255,23 @@ public final class ExchangeRuntimeFactory {
         // Detection is best-effort; the next scheduled tick retries without taking the writer fence.
       }
     };
-    maintenance.scheduleWithFixedDelay(detectSuspiciousTrading, 2L, 5L, TimeUnit.MINUTES);
-    maintenance.scheduleWithFixedDelay(resumeHalted, 1L, 1L, TimeUnit.MINUTES);
-    maintenance.scheduleWithFixedDelay(() -> flushWhileOwned(
+    this.maintenance.scheduleWithFixedDelay(detectSuspiciousTrading, 2L, 5L, TimeUnit.MINUTES);
+    this.maintenance.scheduleWithFixedDelay(resumeHalted, 1L, 1L, TimeUnit.MINUTES);
+    this.maintenance.scheduleWithFixedDelay(() -> flushWhileOwned(
         database.writer(), marketData, Instant.now()), 1L, 1L, TimeUnit.MINUTES);
     java.util.List<String> marketIds = java.util.List.copyOf(registry.marketIds());
-    maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
+    this.candleRetentionDays = Math.max(1, addon.getConfig().getInt(
+        "market-data.candle-retention-days", 365));
+    this.maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
         database.writer(), () -> marketData.purgeOldCandles(
             java.time.Duration.ofDays(candleRetentionDays), marketIds)),
         30L, 24L * 60L, TimeUnit.MINUTES);
-    if (reconciliationIntervalMinutes > 0) {
-      maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
-          database.writer(), () -> {
-            com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport report =
-                repository.reconcile();
-            if (!report.balanced()) {
-              addon.getLogger().warning("Exchange reconciliation detected differences: "
-                  + report);
-            }
-          }), 15L, reconciliationIntervalMinutes, TimeUnit.MINUTES);
-    }
+    this.reconciliationIntervalMinutes = addon.getConfig().getInt(
+        "operations.reconciliation-interval-minutes", 1440);
+    scheduleReconciliation(this.maintenance, repository);
     uiMaintenance.scheduleWithFixedDelay(marketData::publishPlayerUpdates,
         1L, 1L, TimeUnit.SECONDS);
-    applyOperationalSettings();
-    final ScheduledExecutorService maintenanceForClose = maintenance;
+    final ScheduledExecutorService maintenanceForClose = this.maintenance;
     final ScheduledExecutorService uiMaintenanceForClose = uiMaintenance;
 
       ExchangeRuntime runtime = new ExchangeRuntime(database.writer(),
@@ -295,8 +290,9 @@ public final class ExchangeRuntimeFactory {
               recoveryFenceExecutor)), addon);
       return runtime;
     } catch (Exception failure) {
-      if (maintenance != null) {
-        maintenance.shutdownNow();
+      if (this.maintenance != null) {
+        this.maintenance.shutdownNow();
+        this.maintenance = null;
       }
       if (uiMaintenance != null) {
         uiMaintenance.shutdownNow();
@@ -363,24 +359,55 @@ public final class ExchangeRuntimeFactory {
     }
     this.registry = liveRegistry;
     if (liveViews != null) {
+      for (String marketId : liveMarkets.keySet()) {
+        MarketDefinition next = liveRegistry.require(marketId);
+        String symbol = next.assetType() == AssetType.VIRTUAL_SECURITY
+            ? next.security().symbol() : null;
+        Long totalSupply = next.assetType() == AssetType.VIRTUAL_SECURITY
+            ? next.security().totalSupply() : null;
+        liveViews.updateMarketMetadata(marketId, next.displayName(),
+            next.assetType().name(), symbol, totalSupply);
+      }
       long guiRefreshMs = Math.max(250L, addon.getConfig().getLong(
           "market-data.gui-refresh-ms", 1000));
       liveViews.updateRefreshInterval(java.time.Duration.ofMillis(guiRefreshMs));
     }
-    applyOperationalSettings();
-  }
-
-  /**
-   * Hot-applies scheduler-backed settings so configuration changes do not require a restart. The
-   * settings are read from the already-reloaded Bukkit configuration; every scheduled task re-reads
-   * them on each tick, so the values take effect without rescheduling.
-   */
-  private void applyOperationalSettings() {
     FileConfiguration config = addon.getConfig();
     this.candleRetentionDays = Math.max(1, config.getInt(
         "market-data.candle-retention-days", 365));
-    this.reconciliationIntervalMinutes = config.getInt(
+    int nextReconciliationInterval = config.getInt(
         "operations.reconciliation-interval-minutes", 1440);
+    if (nextReconciliationInterval != this.reconciliationIntervalMinutes) {
+      this.reconciliationIntervalMinutes = nextReconciliationInterval;
+      ScheduledFuture<?> previous = this.reconciliationTask;
+      this.reconciliationTask = null;
+      if (previous != null) {
+        previous.cancel(false);
+      }
+      scheduleReconciliation(this.maintenance, this.repository);
+    }
+  }
+
+  /**
+   * Schedules the ledger reconciliation on the maintenance executor. Reload cancels the previous
+   * future and reschedules with the new interval, so changing or disabling reconciliation never
+   * requires a restart.
+   */
+  private void scheduleReconciliation(
+      ScheduledExecutorService maintenance, JdbcExchangeRepository repository) {
+    int interval = this.reconciliationIntervalMinutes;
+    if (interval <= 0 || maintenance == null || maintenance.isShutdown()) {
+      return;
+    }
+    this.reconciliationTask = maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
+        database.writer(), () -> {
+          com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport report =
+              repository.reconcile();
+          if (!report.balanced()) {
+            addon.getLogger().warning("Exchange reconciliation detected differences: "
+                + report);
+          }
+        }), 15L, interval, TimeUnit.MINUTES);
   }
 
   /**

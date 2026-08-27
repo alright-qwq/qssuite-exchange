@@ -321,6 +321,22 @@ class ExchangeViewServiceTest {
         .hasMessageContaining("already exists");
   }
 
+  @Test
+  void hotUpdateMarketMetadataRefreshesDisplayNameInExistingViews() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    MarketDataService marketData = new MarketDataService(new CandleAggregator());
+    ExchangeViewService views = new ExchangeViewService(java.util.Map.of("concept_alpha",
+        new ExchangeViewService.MarketView("concept_alpha", "Alpha", fixture.service(),
+            "VIRTUAL_SECURITY", "ALPHA", 1000L, () -> "OPEN", () -> 400L)),
+        marketData, Runnable::run);
+
+    views.updateMarketMetadata("concept_alpha", "Alpha Prime", "VIRTUAL_SECURITY", "ALPHA", 1000L);
+
+    assertThat(views.resolveMarketIdBySymbol("alpha")).isEqualTo("concept_alpha");
+    assertThat(views.securitySymbols()).containsExactly("ALPHA");
+    assertThat(views.marketRow("concept_alpha").join().displayName()).isEqualTo("Alpha Prime");
+  }
+
   private static final class RecordingRepository implements ExchangeRepository {
     private final Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), "diamond-usd",
         UUID.randomUUID(), OrderSide.BUY, OrderType.LIMIT, TimeInForce.GTC,
