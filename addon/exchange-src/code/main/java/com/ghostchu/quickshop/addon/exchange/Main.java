@@ -37,6 +37,7 @@ public final class Main extends JavaPlugin implements Listener {
   private ExchangeMenuService menus;
   private ExchangeMenuListener menuListener;
   private DrainingExecutor adminReads;
+  private boolean mainListenerRegistered;
 
   static java.util.List<String> firstRunResources() {
     return java.util.List.of("markets.yml", "messages.yml");
@@ -55,31 +56,61 @@ public final class Main extends JavaPlugin implements Listener {
       return;
     }
     try {
-      runtimeFactory = new ExchangeRuntimeFactory(this, QuickShop.getInstance());
-      runtime = runtimeFactory.create();
-      runtime.start();
-      registerPlayerEntrypoints();
-      Bukkit.getPluginManager().registerEvents(this, this);
+      startExchange();
     } catch (Exception failure) {
-      ExchangeRuntime failedRuntime = runtime;
-      runtime = null;
-      runtimeFactory = null;
-      ShutdownSequence.close(this::unregisterPlayerEntrypoints,
-          () -> {
-            if (failedRuntime != null) {
-              failedRuntime.close();
-            }
-          }, cleanupFailure -> getLogger().log(Level.SEVERE,
-              "Exchange startup cleanup failed", cleanupFailure));
+      cleanupAfterFailedStart();
       getLogger().log(Level.SEVERE,
           "Exchange startup failed; addon remains disabled. Fix the configuration and run"
-              + " /qse reload or restart the server. Cause:", failure);
+              + " /qse reload to retry without restarting the server. Cause:", failure);
     }
+  }
+
+  /**
+   * Creates, starts and wires the exchange runtime. Safe to call again after a failed start or a
+   * runtime teardown because it first releases any previous runtime and entry points.
+   */
+  private void startExchange() throws Exception {
+    ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+        () -> {
+          if (runtime != null) {
+            runtime.close();
+          }
+        }, failure -> getLogger().log(Level.SEVERE,
+            "Exchange previous runtime cleanup failed", failure));
+    runtime = null;
+    runtimeFactory = new ExchangeRuntimeFactory(this, QuickShop.getInstance());
+    ExchangeRuntime started = runtimeFactory.create();
+    started.start();
+    runtime = started;
+    registerPlayerEntrypoints();
+    registerMainListener();
+  }
+
+  private void registerMainListener() {
+    if (mainListenerRegistered) {
+      return;
+    }
+    Bukkit.getPluginManager().registerEvents(this, this);
+    mainListenerRegistered = true;
+  }
+
+  private void cleanupAfterFailedStart() {
+    ExchangeRuntime failedRuntime = runtime;
+    runtime = null;
+    mainListenerRegistered = false;
+    ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+        () -> {
+          if (failedRuntime != null) {
+            failedRuntime.close();
+          }
+        }, cleanupFailure -> getLogger().log(Level.SEVERE,
+            "Exchange startup cleanup failed", cleanupFailure));
   }
 
   @Override
   public void onDisable() {
     ExchangeRuntime activeRuntime = runtime;
+    mainListenerRegistered = false;
     ShutdownSequence.close(this::unregisterPlayerEntrypoints,
         () -> {
           if (activeRuntime != null) {
@@ -102,9 +133,20 @@ public final class Main extends JavaPlugin implements Listener {
   public ReloadResult reloadExchangeConfig() {
     ExchangeRuntime activeRuntime = runtime;
     ExchangeRuntimeFactory factory = runtimeFactory;
-    if (activeRuntime == null || factory == null) {
-      getLogger().warning("Exchange reload skipped: runtime is not started");
-      return new ReloadResult(false, "exchange runtime is not started");
+    if (activeRuntime == null) {
+      getLogger().info("Exchange runtime is not started; attempting a full startup recovery");
+      try {
+        startExchange();
+        return new ReloadResult(true, null);
+      } catch (Exception failure) {
+        cleanupAfterFailedStart();
+        getLogger().log(Level.SEVERE,
+            "Exchange startup recovery failed; previous configuration is still in effect. Cause:",
+            failure);
+        String cause = failure.getMessage() == null
+            ? failure.getClass().getSimpleName() : failure.getMessage();
+        return new ReloadResult(false, cause);
+      }
     }
     try {
       reloadConfig();

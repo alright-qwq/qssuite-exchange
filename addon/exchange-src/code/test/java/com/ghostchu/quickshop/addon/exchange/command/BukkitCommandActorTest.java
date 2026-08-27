@@ -2,6 +2,7 @@ package com.ghostchu.quickshop.addon.exchange.command;
 
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
 import com.ghostchu.quickshop.addon.exchange.Main.ReloadResult;
+import com.ghostchu.quickshop.addon.exchange.Main;
 import be.seeseemelk.mockbukkit.MockBukkit;
 import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.entity.PlayerMock;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BukkitCommandActorTest {
   private static ServerMock server;
@@ -58,5 +60,13 @@ class BukkitCommandActorTest {
 
     assertThat(player.nextMessage()).isEqualTo("Reloading");
     assertThat(player.nextMessage()).isEqualTo("Failed: tick size changed from 0.01 to 0.05");
+  }
+
+  @Test
+  void reloadResultRejectsSuccessWithCause() {
+    assertThatThrownBy(() -> new ReloadResult(true, "unexpected"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("successful reload");
+    assertThat(new ReloadResult(false, "blocked").success()).isFalse();
   }
 }
