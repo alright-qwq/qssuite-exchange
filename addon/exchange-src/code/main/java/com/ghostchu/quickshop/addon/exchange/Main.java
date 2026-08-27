@@ -30,6 +30,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class Main extends JavaPlugin implements Listener {
+  /** Matches {@code config-version} in the bundled config.yml. */
+  private static final int CONFIG_VERSION = 2;
+
   private ExchangeRuntime runtime;
   private ExchangeRuntimeFactory runtimeFactory;
   private CommandContainer exchangeCommand;
@@ -62,6 +65,12 @@ public final class Main extends JavaPlugin implements Listener {
         getLogger().info("QuickShop Exchange is disabled in config.yml");
       }
       return;
+    }
+    int configVersion = getConfig().getInt("config-version", 1);
+    if (configVersion < CONFIG_VERSION) {
+      getLogger().warning("config.yml is version " + configVersion + " but this build expects "
+          + CONFIG_VERSION + "; new settings use their defaults. Review the bundled config.yml"
+          + " for new options before relying on them.");
     }
     try {
       synchronized (lifecycleLock) {
