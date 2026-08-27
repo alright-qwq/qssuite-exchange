@@ -20,6 +20,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdminExchangeServiceTest {
   @Test
@@ -37,6 +38,24 @@ class AdminExchangeServiceTest {
 
     assertThat(result.replayed()).isFalse();
     assertThat(attached).containsExactly("new_alpha:false");
+  }
+
+  @Test
+  void wrapsLiveAttachmentFailureSoTheOperatorCanRecoverWithReload() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository(), null, null,
+        new com.ghostchu.quickshop.addon.exchange.security.SecurityService(fixture.repository()),
+        null, null, (marketId, replayed) -> {
+          throw new IllegalStateException("markets.yml is read-only");
+        });
+    UUID actor = UUID.randomUUID();
+
+    assertThatThrownBy(() -> admin.securityCreate(actor, UUID.randomUUID(), "new_beta", "NBETA",
+        "New Beta", "Concept stock", "default", new BigDecimal("10.00"), 1000, 1))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("created-but-not-attached:new_beta")
+        .hasMessageContaining("/qse reload");
   }
 
   @Test
