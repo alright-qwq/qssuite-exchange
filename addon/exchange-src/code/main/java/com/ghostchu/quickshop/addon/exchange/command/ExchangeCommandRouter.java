@@ -55,9 +55,11 @@ public final class ExchangeCommandRouter {
     }
     try {
       executeGuarded(actor, args);
-    } catch (RuntimeException failure) {
+    } catch (Throwable failure) {
       // A single bad command or a transient runtime fault must never take down the command
-      // pipeline: report the failure to the player and keep the plugin usable.
+      // pipeline: report the failure to the player and keep the plugin usable. Throwable also
+      // captures linkage/classloading errors so a shaded-library conflict cannot escape into the
+      // platform command executor.
       LOGGER.log(java.util.logging.Level.SEVERE,
           "Exchange command failed for account " + actor.accountId(), failure);
       actor.commandFailed();

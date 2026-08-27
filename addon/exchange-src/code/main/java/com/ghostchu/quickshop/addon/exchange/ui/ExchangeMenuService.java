@@ -59,10 +59,13 @@ public final class ExchangeMenuService implements AutoCloseable {
       MenuPlayer menuPlayer = QuickShop.getInstance().createMenuPlayer(player);
       int page = ExchangeMenuPage.forName(request.menuName()).page();
       MenuManager.instance().open(ExchangeMenu.NAME, page, menuPlayer);
-    } catch (RuntimeException failure) {
+    } catch (Throwable failure) {
       contexts.remove(player.getUniqueId());
       MenuManager.instance().removeViewer(player.getUniqueId());
-      throw failure;
+      // Wrap Errors (classloading/linkage conflicts, e.g. a shaded menu API mismatch) into a
+      // checked-style runtime exception so command routing can surface a friendly failure instead
+      // of letting the Error escape into the platform command executor.
+      throw new IllegalStateException("failed to open exchange menu", failure);
     }
   }
 

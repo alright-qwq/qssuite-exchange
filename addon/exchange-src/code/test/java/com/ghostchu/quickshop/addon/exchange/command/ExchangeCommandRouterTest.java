@@ -61,6 +61,16 @@ class ExchangeCommandRouterTest {
   }
 
   @Test
+  void containsLinkageErrorsFromMenuOpeningInsteadOfEscaping() {
+    Actor actor = new Actor("quickshop.exchange.use");
+    actor.failMenuOpenWith = new LinkageError("shaded menu class conflict");
+
+    new ExchangeCommandRouter(UUID::randomUUID).execute(actor, new String[0]);
+
+    assertThat(actor.commandFailed).isTrue();
+  }
+
+  @Test
   void resolvesStockSymbolToItsMarketId() {
     Actor actor = new Actor("quickshop.exchange.use");
     ExchangeCommandRouter router = new ExchangeCommandRouter(
@@ -269,6 +279,7 @@ class ExchangeCommandRouterTest {
     private ExchangeMenuRequest opened;
     private boolean reloaded;
     private boolean commandFailed;
+    private Error failMenuOpenWith;
     private Actor(String... permission) { permissions.addAll(java.util.Arrays.asList(permission)); }
     public UUID accountId() { return accountId; }
     public boolean hasPermission(String permission) { return permissions.contains(permission); }
@@ -276,7 +287,12 @@ class ExchangeCommandRouterTest {
       message = key + (arguments.length == 0 ? "" : ":" + arguments[0]);
     }
     public void openMenu(String menuName, int page) { }
-    public void openMenu(ExchangeMenuRequest request) { opened = request; }
+    public void openMenu(ExchangeMenuRequest request) {
+      if (failMenuOpenWith != null) {
+        throw failMenuOpenWith;
+      }
+      opened = request;
+    }
     public void reloadRequested() { reloaded = true; }
     @Override public void commandFailed() { commandFailed = true; }
   }
