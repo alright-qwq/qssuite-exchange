@@ -110,24 +110,17 @@ final class MarketDetailPage {
     String bid = row.bestBid() == null ? "-" : row.bestBid().toPlainString();
     String ask = row.bestAsk() == null ? "-" : row.bestAsk().toPlainString();
     String spread = dashboard.spread() == null ? "-" : dashboard.spread().toPlainString();
-    String spreadPercent = dashboard.spreadPercent() == null ? "-"
-        : dashboard.spreadPercent().multiply(java.math.BigDecimal.valueOf(100)).stripTrailingZeros()
-            .toPlainString() + "%";
+    String spreadPercent = percent(dashboard.spreadPercent());
     java.util.ArrayList<Component> lore = new java.util.ArrayList<>(List.of(
         messages.component(player, "ui-market-last", row.lastPrice() == null ? "-"
             : row.lastPrice().toPlainString()),
         messages.component(player, "ui-market-bid", bid),
         messages.component(player, "ui-market-ask", ask),
         messages.component(player, "ui-market-spread", spread, spreadPercent),
-        messages.component(player, "ui-market-change-percent",
-            row.change24h() == null ? "-"
-                : row.change24h().multiply(java.math.BigDecimal.valueOf(100))
-                    .stripTrailingZeros().toPlainString()).color(changeColor(row.change24h())),
+        messages.component(player, "ui-market-change-percent", percent(row.change24h()))
+            .color(changeColor(row.change24h())),
         messages.component(player, "ui-market-notional", notional(dashboard)),
-        messages.component(player, "ui-market-volatility",
-            row.volatility24h() == null ? "-"
-                : row.volatility24h().multiply(java.math.BigDecimal.valueOf(100))
-                    .stripTrailingZeros().toPlainString() + "%"),
+        messages.component(player, "ui-market-volatility", percent(row.volatility24h())),
         messages.component(player, "ui-market-high-low",
             row.high24h() == null ? "-" : row.high24h().toPlainString(),
             row.low24h() == null ? "-" : row.low24h().toPlainString()),
@@ -317,9 +310,7 @@ final class MarketDetailPage {
         messages.component(player, row.executable() ? "ui-depth-executable" : "ui-depth-protected")));
     java.math.BigDecimal distance = distancePercent(row.price(), market.lastPrice());
     if (distance != null) {
-      lore.add(messages.component(player, "ui-depth-distance",
-          distance.multiply(java.math.BigDecimal.valueOf(100)).stripTrailingZeros()
-              .toPlainString() + "%"));
+      lore.add(messages.component(player, "ui-depth-distance", percent(distance)));
     }
     page.addIcon(player.getUniqueId(), new IconBuilder(QuickShop.getInstance().stack().of(material,
         Math.max(1, row.strength())).customName(messages.component(player,
@@ -470,6 +461,13 @@ final class MarketDetailPage {
       case DOWN -> "ui-trend-down";
       case FLAT -> "ui-trend-flat";
     };
+  }
+
+  static String percent(BigDecimal fraction) {
+    return fraction == null ? "-"
+        : fraction.multiply(java.math.BigDecimal.valueOf(100))
+            .setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+            + "%";
   }
 
   private void addOrderIcon(PlayerInstancePage page, Player player, MarketRow row,

@@ -249,10 +249,11 @@ final class MarketListPage {
             messages.component(player, "ui-overview-loser", loser)))).withSlot(4).build());
   }
 
-  private static String percent(BigDecimal fraction) {
+  static String percent(BigDecimal fraction) {
     return fraction == null ? "-"
-        : fraction.multiply(java.math.BigDecimal.valueOf(100)).stripTrailingZeros()
-            .toPlainString() + "%";
+        : fraction.multiply(java.math.BigDecimal.valueOf(100))
+            .setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+            + "%";
   }
 
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,

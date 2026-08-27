@@ -71,6 +71,17 @@ class MarketListPresenterTest {
   }
 
   @Test
+  void formatsPercentFractionsToTwoDecimalPlaces() {
+    assertThat(MarketListPage.percent(new BigDecimal("0.12345678")))
+        .isEqualTo("12.35%");
+    assertThat(MarketListPage.percent(new BigDecimal("-0.004")))
+        .isEqualTo("-0.4%");
+    assertThat(MarketListPage.percent(null)).isEqualTo("-");
+    assertThat(MarketListPage.percent(new BigDecimal("0.00001")))
+        .isEqualTo("0%");
+  }
+
+  @Test
   void sortsNullChangeAndNullLastMarketsWithoutThrowing() {
     MarketRow noTrades = new MarketRow("new-stock", "New Stock", null, null, null, null, 0,
         MarketStatus.OPEN, "VIRTUAL_SECURITY", "NEW", 1000L, "OPEN", null, null, null, null, null);
