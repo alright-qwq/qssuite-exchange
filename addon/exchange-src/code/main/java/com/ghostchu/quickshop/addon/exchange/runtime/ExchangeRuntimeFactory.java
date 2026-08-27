@@ -316,7 +316,15 @@ public final class ExchangeRuntimeFactory {
     }
     File reloadConfig = new File(addon.getDataFolder(), "config.yml");
     File reloadMarkets = new File(addon.getDataFolder(), "markets.yml");
-    MarketRegistry reloaded = MarketRegistry.load(reloadConfig, reloadMarkets);
+    MarketRegistry reloaded;
+    try {
+      reloaded = MarketRegistry.load(reloadConfig, reloadMarkets);
+    } catch (IllegalArgumentException configurationFailure) {
+      throw new IllegalArgumentException(
+          "exchange configuration is invalid; fix markets.yml/config.yml and retry /qse reload"
+              + " (previous settings are still active). Cause: " + configurationFailure.getMessage(),
+          configurationFailure);
+    }
     if (!liveMarkets.keySet().equals(reloaded.marketIds())) {
       java.util.Set<String> added = new java.util.TreeSet<>(reloaded.marketIds());
       added.removeAll(liveMarkets.keySet());

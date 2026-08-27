@@ -185,6 +185,20 @@ class MarketRegistryTest {
   }
 
   @Test
+  void rejectsVirtualSecurityMarketWhoseMinimumQuantityMisalignsWithUnit(@TempDir Path temp)
+      throws Exception {
+    Path config = temp.resolve("config.yml");
+    Path markets = temp.resolve("markets.yml");
+    Files.writeString(config, riskDefaultsYaml());
+    Files.writeString(markets, virtualMarketYaml(false).replace("min-quantity: 1", "min-quantity: 3")
+        .replace("minimum-unit: 1", "minimum-unit: 2"));
+
+    assertThatThrownBy(() -> MarketRegistry.load(config.toFile(), markets.toFile()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("minimum quantity must align with security unit");
+  }
+
+  @Test
   void blocksContainerShopIgnoresVirtualSecurityMarkets() {
     MarketRegistry registry = new MarketRegistry(Map.of("concept_alpha", virtualDefinition("ALPHA")));
 
