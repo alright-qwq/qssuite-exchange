@@ -91,7 +91,7 @@ public final class Main extends JavaPlugin implements Listener {
           }, failure -> getLogger().log(Level.SEVERE,
               "Exchange previous runtime cleanup failed", failure));
       runtime = null;
-      runtimeFactory = new ExchangeRuntimeFactory(this, QuickShop.getInstance());
+      runtimeFactory = new ExchangeRuntimeFactory(this, QuickShop.getInstance(), lifecycleLock);
       ExchangeRuntime started = runtimeFactory.create();
       started.start();
       runtime = started;

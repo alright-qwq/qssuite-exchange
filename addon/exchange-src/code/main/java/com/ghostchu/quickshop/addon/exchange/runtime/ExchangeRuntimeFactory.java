@@ -85,10 +85,16 @@ public final class ExchangeRuntimeFactory {
   private volatile ScheduledFuture<?> reconciliationTask;
   private volatile org.bukkit.event.Listener containerShopListener;
   private volatile org.bukkit.event.Listener transferLoginListener;
+  private final Object lifecycleLock;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
+    this(addon, quickShop, null);
+  }
+
+  public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop, Object lifecycleLock) {
     this.addon = java.util.Objects.requireNonNull(addon, "addon");
     this.quickShop = java.util.Objects.requireNonNull(quickShop, "quickShop");
+    this.lifecycleLock = lifecycleLock == null ? this : lifecycleLock;
   }
 
   public ExchangeRuntime create() throws Exception {
@@ -330,92 +336,94 @@ public final class ExchangeRuntimeFactory {
 
   /** Re-reads markets.yml/config.yml and hot-applies operational risk settings. */
   public void reloadConfig() {
-    Map<String, PersistentOrderService> liveMarkets = this.markets;
-    MarketRegistry liveRegistry = this.registry;
-    ExchangeViewService liveViews = this.views;
-    if (liveMarkets == null || liveRegistry == null) {
-      throw new IllegalStateException("exchange runtime is not started");
-    }
-    File reloadConfig = new File(addon.getDataFolder(), "config.yml");
-    File reloadMarkets = new File(addon.getDataFolder(), "markets.yml");
-    MarketRegistry reloaded;
-    try {
-      // Reload must not restore persisted versions onto the freshly parsed definitions: the live
-      // registry already carries the current versions and its own repository persistence, so the
-      // reload below persists any version bump. Restoring here would reject legitimate fee/risk
-      // changes whose persisted active rate still matches the old file.
-      reloaded = MarketRegistry.load(reloadConfig, reloadMarkets);
-    } catch (IllegalArgumentException configurationFailure) {
-      throw new IllegalArgumentException(
-          "exchange configuration is invalid; fix markets.yml/config.yml and retry /qse reload"
-              + " (previous settings are still active). Cause: " + configurationFailure.getMessage(),
-          configurationFailure);
-    }
-    if (!liveMarkets.keySet().equals(reloaded.marketIds())) {
-      java.util.Set<String> added = new java.util.TreeSet<>(reloaded.marketIds());
-      added.removeAll(liveMarkets.keySet());
-      java.util.Set<String> removed = new java.util.TreeSet<>(liveMarkets.keySet());
-      removed.removeAll(reloaded.marketIds());
-      StringBuilder blocked = new StringBuilder("market set cannot change during a hot reload");
-      if (!added.isEmpty()) {
-        blocked.append("; add new markets while the server is stopped or use the admin"
-            + " create-market command instead: ").append(added);
+    synchronized (lifecycleLock) {
+      Map<String, PersistentOrderService> liveMarkets = this.markets;
+      MarketRegistry liveRegistry = this.registry;
+      ExchangeViewService liveViews = this.views;
+      if (liveMarkets == null || liveRegistry == null) {
+        throw new IllegalStateException("exchange runtime is not started");
       }
-      if (!removed.isEmpty()) {
-        blocked.append("; remove markets while the server is stopped after pausing them and"
-            + " cancelling open orders: ").append(removed);
+      File reloadConfig = new File(addon.getDataFolder(), "config.yml");
+      File reloadMarkets = new File(addon.getDataFolder(), "markets.yml");
+      MarketRegistry reloaded;
+      try {
+        // Reload must not restore persisted versions onto the freshly parsed definitions: the live
+        // registry already carries the current versions and its own repository persistence, so the
+        // reload below persists any version bump. Restoring here would reject legitimate fee/risk
+        // changes whose persisted active rate still matches the old file.
+        reloaded = MarketRegistry.load(reloadConfig, reloadMarkets);
+      } catch (IllegalArgumentException configurationFailure) {
+        throw new IllegalArgumentException(
+            "exchange configuration is invalid; fix markets.yml/config.yml and retry /qse reload"
+                + " (previous settings are still active). Cause: " + configurationFailure.getMessage(),
+            configurationFailure);
       }
-      throw new IllegalStateException(
-          blocked.toString());
-    }
-    java.util.List<String> allBlockers = new java.util.ArrayList<>();
-    for (String marketId : liveMarkets.keySet()) {
-      MarketDefinition current = liveRegistry.require(marketId);
-      MarketDefinition next = reloaded.require(marketId);
-      allBlockers.addAll(describeReloadBlockers(current, next));
-    }
-    if (!allBlockers.isEmpty()) {
-      throw new IllegalArgumentException(String.join("; ", allBlockers)
-          + ". Pause the affected markets, cancel their open orders, then retry /qse reload");
-    }
-    // Commit the registry first: its persistence write is the only step that can fail, and a
-    // failure leaves the registry (and therefore every service/view) untouched. The subsequent
-    // in-memory applications are pure swaps that cannot fail once the definitions are committed.
-    liveRegistry.reload(reloaded.definitions(),
-        ignored -> new MarketStateReader.State(MarketStatus.PAUSED, 0));
-    for (String marketId : liveMarkets.keySet()) {
-      MarketDefinition next = liveRegistry.require(marketId);
-      PersistentOrderService service = liveMarkets.get(marketId);
-      service.updateRiskLimits(limits(next), accountLimits(next.risk()));
-    }
-    this.registry = liveRegistry;
-    if (liveViews != null) {
+      if (!liveMarkets.keySet().equals(reloaded.marketIds())) {
+        java.util.Set<String> added = new java.util.TreeSet<>(reloaded.marketIds());
+        added.removeAll(liveMarkets.keySet());
+        java.util.Set<String> removed = new java.util.TreeSet<>(liveMarkets.keySet());
+        removed.removeAll(reloaded.marketIds());
+        StringBuilder blocked = new StringBuilder("market set cannot change during a hot reload");
+        if (!added.isEmpty()) {
+          blocked.append("; add new markets while the server is stopped or use the admin"
+              + " create-market command instead: ").append(added);
+        }
+        if (!removed.isEmpty()) {
+          blocked.append("; remove markets while the server is stopped after pausing them and"
+              + " cancelling open orders: ").append(removed);
+        }
+        throw new IllegalStateException(
+            blocked.toString());
+      }
+      java.util.List<String> allBlockers = new java.util.ArrayList<>();
+      for (String marketId : liveMarkets.keySet()) {
+        MarketDefinition current = liveRegistry.require(marketId);
+        MarketDefinition next = reloaded.require(marketId);
+        allBlockers.addAll(describeReloadBlockers(current, next));
+      }
+      if (!allBlockers.isEmpty()) {
+        throw new IllegalArgumentException(String.join("; ", allBlockers)
+            + ". Pause the affected markets, cancel their open orders, then retry /qse reload");
+      }
+      // Commit the registry first: its persistence write is the only step that can fail, and a
+      // failure leaves the registry (and therefore every service/view) untouched. The subsequent
+      // in-memory applications are pure swaps that cannot fail once the definitions are committed.
+      liveRegistry.reload(reloaded.definitions(),
+          ignored -> new MarketStateReader.State(MarketStatus.PAUSED, 0));
       for (String marketId : liveMarkets.keySet()) {
         MarketDefinition next = liveRegistry.require(marketId);
-        String symbol = next.assetType() == AssetType.VIRTUAL_SECURITY
-            ? next.security().symbol() : null;
-        Long totalSupply = next.assetType() == AssetType.VIRTUAL_SECURITY
-            ? next.security().totalSupply() : null;
-        liveViews.updateMarketMetadata(marketId, next.displayName(),
-            next.assetType().name(), symbol, totalSupply);
+        PersistentOrderService service = liveMarkets.get(marketId);
+        service.updateRiskLimits(limits(next), accountLimits(next.risk()));
       }
-      long guiRefreshMs = Math.max(250L, addon.getConfig().getLong(
-          "market-data.gui-refresh-ms", 1000));
-      liveViews.updateRefreshInterval(java.time.Duration.ofMillis(guiRefreshMs));
-    }
-    FileConfiguration config = addon.getConfig();
-    this.candleRetentionDays = Math.max(1, config.getInt(
-        "market-data.candle-retention-days", 365));
-    int nextReconciliationInterval = config.getInt(
-        "operations.reconciliation-interval-minutes", 1440);
-    if (nextReconciliationInterval != this.reconciliationIntervalMinutes) {
-      this.reconciliationIntervalMinutes = nextReconciliationInterval;
-      ScheduledFuture<?> previous = this.reconciliationTask;
-      this.reconciliationTask = null;
-      if (previous != null) {
-        previous.cancel(false);
+      this.registry = liveRegistry;
+      if (liveViews != null) {
+        for (String marketId : liveMarkets.keySet()) {
+          MarketDefinition next = liveRegistry.require(marketId);
+          String symbol = next.assetType() == AssetType.VIRTUAL_SECURITY
+              ? next.security().symbol() : null;
+          Long totalSupply = next.assetType() == AssetType.VIRTUAL_SECURITY
+              ? next.security().totalSupply() : null;
+          liveViews.updateMarketMetadata(marketId, next.displayName(),
+              next.assetType().name(), symbol, totalSupply);
+        }
+        long guiRefreshMs = Math.max(250L, addon.getConfig().getLong(
+            "market-data.gui-refresh-ms", 1000));
+        liveViews.updateRefreshInterval(java.time.Duration.ofMillis(guiRefreshMs));
       }
-      scheduleReconciliation(this.maintenance, this.repository);
+      FileConfiguration config = addon.getConfig();
+      this.candleRetentionDays = Math.max(1, config.getInt(
+          "market-data.candle-retention-days", 365));
+      int nextReconciliationInterval = config.getInt(
+          "operations.reconciliation-interval-minutes", 1440);
+      if (nextReconciliationInterval != this.reconciliationIntervalMinutes) {
+        this.reconciliationIntervalMinutes = nextReconciliationInterval;
+        ScheduledFuture<?> previous = this.reconciliationTask;
+        this.reconciliationTask = null;
+        if (previous != null) {
+          previous.cancel(false);
+        }
+        scheduleReconciliation(this.maintenance, this.repository);
+      }
     }
   }
 
@@ -447,63 +455,63 @@ public final class ExchangeRuntimeFactory {
    * live order book, registry entry, view and action wiring.
    */
   public void addSecurityMarket(String marketId, boolean replayed) {
-    MarketRegistry liveRegistry = this.registry;
-    ExchangeViewService liveViews = this.views;
-    ExchangeActionService liveActions = this.actions;
-    JdbcExchangeRepository store = this.repository;
-    Database database = this.database;
-    Map<String, PersistentOrderService> liveMarkets = this.markets;
-    if (liveRegistry == null || liveViews == null || liveActions == null || store == null
-        || database == null || liveMarkets == null) {
-      throw new IllegalStateException("exchange runtime is not started");
-    }
-    if (liveMarkets.containsKey(marketId)) {
-      if (replayed) {
-        return;
+    synchronized (lifecycleLock) {
+      MarketRegistry liveRegistry = this.registry;
+      ExchangeViewService liveViews = this.views;
+      ExchangeActionService liveActions = this.actions;
+      JdbcExchangeRepository store = this.repository;
+      Database database = this.database;
+      Map<String, PersistentOrderService> liveMarkets = this.markets;
+      if (liveRegistry == null || liveViews == null || liveActions == null || store == null
+          || database == null || liveMarkets == null) {
+        throw new IllegalStateException("exchange runtime is not started");
       }
-      throw new IllegalArgumentException("market already exists in runtime: " + marketId);
-    }
-    boolean marketRowExists;
-    try {
-      marketRowExists = store.marketExists(marketId);
-    } catch (SQLException failure) {
-      throw new IllegalStateException("failed to verify created market row", failure);
-    }
-    if (!marketRowExists) {
-      throw new IllegalStateException(
-          "created market is missing its persisted market row: " + marketId);
-    }
-    MarketDefinition definition;
-    try {
-      definition = store.inTransaction(tx -> {
-        SecurityDefinitionState security =
-            tx.securityDefinition(marketId);
-        return SecurityService.buildMarketDefinition(
-            marketId, security.symbol(), security.name(), security.description(),
-            security.currencyId(), security.basePrice(), security.totalSupply(),
-            security.minimumUnit());
-      });
-    } catch (SQLException failure) {
-      throw new IllegalStateException("failed to load created security definition", failure);
-    }
-    MarketDataService marketData = this.marketData;
-    MarketRules rules = rules(definition);
-    RiskLimits limits = limits(definition);
-    AssetCustody custody = new SecurityAssetCustody(definition.security().minimumUnit());
-    PersistentOrderService service = new PersistentOrderService(
-        store, rules, limits, RecoveryHandler.NO_OP,
-        accountLimits(definition.risk()), marketData, custody);
-    try {
-      service.recoverFromDatabase();
-    } catch (SQLException failure) {
-      throw new IllegalStateException(
-          "failed to recover the newly created order book: " + marketId, failure);
-    }
-    MarketView view = buildMarketView(definition, service, store);
-    if (!replayed) {
-      persistMarketToMarketsFile(definition);
-    }
-    synchronized (this) {
+      if (liveMarkets.containsKey(marketId)) {
+        if (replayed) {
+          return;
+        }
+        throw new IllegalArgumentException("market already exists in runtime: " + marketId);
+      }
+      boolean marketRowExists;
+      try {
+        marketRowExists = store.marketExists(marketId);
+      } catch (SQLException failure) {
+        throw new IllegalStateException("failed to verify created market row", failure);
+      }
+      if (!marketRowExists) {
+        throw new IllegalStateException(
+            "created market is missing its persisted market row: " + marketId);
+      }
+      MarketDefinition definition;
+      try {
+        definition = store.inTransaction(tx -> {
+          SecurityDefinitionState security =
+              tx.securityDefinition(marketId);
+          return SecurityService.buildMarketDefinition(
+              marketId, security.symbol(), security.name(), security.description(),
+              security.currencyId(), security.basePrice(), security.totalSupply(),
+              security.minimumUnit());
+        });
+      } catch (SQLException failure) {
+        throw new IllegalStateException("failed to load created security definition", failure);
+      }
+      MarketDataService marketData = this.marketData;
+      MarketRules rules = rules(definition);
+      RiskLimits limits = limits(definition);
+      AssetCustody custody = new SecurityAssetCustody(definition.security().minimumUnit());
+      PersistentOrderService service = new PersistentOrderService(
+          store, rules, limits, RecoveryHandler.NO_OP,
+          accountLimits(definition.risk()), marketData, custody);
+      try {
+        service.recoverFromDatabase();
+      } catch (SQLException failure) {
+        throw new IllegalStateException(
+            "failed to recover the newly created order book: " + marketId, failure);
+      }
+      MarketView view = buildMarketView(definition, service, store);
+      if (!replayed) {
+        persistMarketToMarketsFile(definition);
+      }
       if (this.markets.containsKey(marketId)) {
         if (replayed) {
           return;
