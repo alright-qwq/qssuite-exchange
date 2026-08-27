@@ -1,9 +1,11 @@
 package com.ghostchu.quickshop.addon.exchange.command;
 
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.Main.ReloadResult;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 import com.ghostchu.quickshop.QuickShop;
 import org.bukkit.entity.Player;
 
@@ -13,16 +15,16 @@ public final class BukkitCommandActor implements CommandActor {
   private final AddonMessageService messages;
   private final Locale locale;
   private final MenuOpener menus;
-  private final Runnable reloadAction;
+  private final Supplier<ReloadResult> reloadAction;
 
   public BukkitCommandActor(
       Player player, AddonMessageService messages, Locale locale, MenuOpener menus) {
-    this(player, messages, locale, menus, () -> {});
+    this(player, messages, locale, menus, () -> new ReloadResult(true, null));
   }
 
   public BukkitCommandActor(
       Player player, AddonMessageService messages, Locale locale, MenuOpener menus,
-      Runnable reloadAction) {
+      Supplier<ReloadResult> reloadAction) {
     this.player = Objects.requireNonNull(player, "player");
     this.messages = Objects.requireNonNull(messages, "messages");
     this.locale = Objects.requireNonNull(locale, "locale");
@@ -69,7 +71,9 @@ public final class BukkitCommandActor implements CommandActor {
   @Override
   public void reloadRequested() {
     player.sendMessage(messages.message("reload-requested", locale));
-    reloadAction.run();
+    ReloadResult result = reloadAction.get();
+    player.sendMessage(messages.message(result.success() ? "reload-success" : "reload-failed",
+        locale, result.cause() == null ? "" : result.cause()));
   }
 
   @FunctionalInterface

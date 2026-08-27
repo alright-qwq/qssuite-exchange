@@ -95,22 +95,38 @@ public final class Main extends JavaPlugin implements Listener {
     reloadExchangeConfig();
   }
 
-  /** Re-reads exchange configuration and hot-applies operational settings without restarting. */
-  public void reloadExchangeConfig() {
+  /**
+   * Re-reads exchange configuration and hot-applies operational settings without restarting.
+   * Returns a structured result that callers may surface to the player in their locale.
+   */
+  public ReloadResult reloadExchangeConfig() {
     ExchangeRuntime activeRuntime = runtime;
     ExchangeRuntimeFactory factory = runtimeFactory;
     if (activeRuntime == null || factory == null) {
       getLogger().warning("Exchange reload skipped: runtime is not started");
-      return;
+      return new ReloadResult(false, "exchange runtime is not started");
     }
     try {
       reloadConfig();
       factory.reloadConfig();
       rewirePlayerEntrypoints();
       getLogger().info("Exchange configuration reloaded successfully");
+      return new ReloadResult(true, null);
     } catch (Exception failure) {
       getLogger().log(Level.SEVERE,
           "Exchange configuration reload failed; keeping previous settings. Cause:", failure);
+      String cause = failure.getMessage() == null
+          ? failure.getClass().getSimpleName() : failure.getMessage();
+      return new ReloadResult(false, cause);
+    }
+  }
+
+  /** Structured reload outcome so command actors can localize the message while keeping details. */
+  public record ReloadResult(boolean success, String cause) {
+    public ReloadResult {
+      if (success && cause != null) {
+        throw new IllegalArgumentException("successful reload must not carry a cause");
+      }
     }
   }
 

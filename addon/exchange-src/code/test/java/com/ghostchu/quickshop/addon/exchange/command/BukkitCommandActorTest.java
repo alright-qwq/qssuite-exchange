@@ -1,6 +1,7 @@
 package com.ghostchu.quickshop.addon.exchange.command;
 
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.Main.ReloadResult;
 import be.seeseemelk.mockbukkit.MockBukkit;
 import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.entity.PlayerMock;
@@ -41,5 +42,21 @@ class BukkitCommandActorTest {
 
     assertThat(player.nextMessage()).isEqualTo("Denied");
     assertThat(opened).hasValue("markets:2");
+  }
+
+  @Test
+  void surfacesReloadFailureCauseToThePlayerInTheirLocale() {
+    PlayerMock player = server.addPlayer();
+    AddonMessageService messages = new AddonMessageService(Map.of(
+        "en-US", Map.of("reload-requested", "Reloading",
+            "reload-success", "OK",
+            "reload-failed", "Failed: <0>")));
+    BukkitCommandActor actor = new BukkitCommandActor(player, messages, Locale.US,
+        (menu, page) -> {}, () -> new ReloadResult(false, "tick size changed from 0.01 to 0.05"));
+
+    actor.reloadRequested();
+
+    assertThat(player.nextMessage()).isEqualTo("Reloading");
+    assertThat(player.nextMessage()).isEqualTo("Failed: tick size changed from 0.01 to 0.05");
   }
 }
