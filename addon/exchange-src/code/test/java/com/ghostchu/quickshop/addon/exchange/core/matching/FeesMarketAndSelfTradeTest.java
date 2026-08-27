@@ -89,7 +89,20 @@ class FeesMarketAndSelfTradeTest {
     Reservation reserved = reservations.reserve(
         limit(OrderSide.BUY, "1.01", 2, UUID.randomUUID(), 1), makerCostsMore);
 
-    assertThat(reserved).isEqualTo(new Reservation(new BigDecimal("2.04"), 0));
+    // Fee is rounded once on the whole notional (2.02 * 0.003 -> 0.01 UP), not per unit.
+    assertThat(reserved).isEqualTo(new Reservation(new BigDecimal("2.03"), 0));
+  }
+
+  @Test
+  void reserveLimitBuyFeesOnNotionalNotPricePerUnit() {
+    ReservationCalculator reservations = new ReservationCalculator(new FeeCalculator(2));
+
+    // 0.01 * 10000 = 100.00 notional; worst-case taker fee 0.2% -> 0.20.
+    // Computing the fee on the unit price and multiplying would freeze 100.00 extra.
+    Reservation reserved = reservations.reserve(
+        limit(OrderSide.BUY, "0.01", 10000, UUID.randomUUID(), 1), TestFixtures.rules());
+
+    assertThat(reserved).isEqualTo(new Reservation(new BigDecimal("100.20"), 0));
   }
 
   @Test

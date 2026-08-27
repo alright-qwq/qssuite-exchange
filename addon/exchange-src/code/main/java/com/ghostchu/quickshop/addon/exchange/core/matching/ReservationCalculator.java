@@ -30,8 +30,8 @@ public final class ReservationCalculator {
     BigDecimal quantity = BigDecimal.valueOf(order.remainingQuantity());
     BigDecimal notional = order.limitPrice().multiply(quantity);
     BigDecimal maximumFeeRate = rules.makerFeeRate().max(rules.takerFeeRate());
-    BigDecimal maximumPerFillFees = fees.fee(order.limitPrice(), maximumFeeRate).multiply(quantity);
-    return new Reservation(notional.add(maximumPerFillFees), 0);
+    BigDecimal maximumFees = fees.fee(notional, maximumFeeRate);
+    return new Reservation(notional.add(maximumFees), 0);
   }
 
   public Reservation reserve(Order order, MarketRules rules, OrderBook book,
