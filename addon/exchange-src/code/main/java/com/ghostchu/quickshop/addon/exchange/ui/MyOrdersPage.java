@@ -97,16 +97,18 @@ final class MyOrdersPage {
         : orders.subList(0, Math.min(orders.size(), PAGE_SIZE))) {
       if (slot >= 45) break;
       Order order = persisted.order();
+      int scale = marketPriceScale(order.marketId());
       List<Component> lore = List.of(
           messages.component(player, "ui-order-status", order.status()),
           messages.component(player, "ui-order-remaining", order.remainingQuantity(),
               order.originalQuantity()),
           messages.component(player, "ui-order-price", order.limitPrice() == null
-              ? order.slippageBoundary() : order.limitPrice()),
+              ? messages.formatCurrency(order.slippageBoundary(), scale)
+              : messages.formatCurrency(order.limitPrice(), scale)),
           messages.component(player, order.side() == OrderSide.BUY
               ? "ui-order-frozen-currency" : "ui-order-frozen-quantity",
               order.side() == OrderSide.BUY
-                  ? persisted.reservedCurrency()
+                  ? messages.formatCurrency(persisted.reservedCurrency(), scale)
                   : persisted.reservedQuantity()),
           messages.component(player, "ui-order-time",
               messages.relativeTime(order.createdAt())));
@@ -114,7 +116,7 @@ final class MyOrdersPage {
       if (quote != null && quote.lastPrice() != null) {
         lore = new java.util.ArrayList<>(lore);
         lore.add(messages.component(player, "ui-order-current-price",
-            quote.lastPrice().toPlainString()));
+            messages.formatCurrency(quote.lastPrice(), scale)));
         java.math.BigDecimal boundary = order.limitPrice() == null
             ? order.slippageBoundary() : order.limitPrice();
         if (boundary != null && boundary.signum() > 0) {
@@ -179,5 +181,14 @@ final class MyOrdersPage {
           MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ORDERS.page(),
               click.player());
         })).withSlot(slot).build());
+  }
+
+  private int marketPriceScale(String marketId) {
+    ExchangeViewService.MarketView market = views.market(marketId);
+    int scale = market == null ? -1 : market.service().marketRules().priceScale();
+    if (scale >= 0) {
+      messages.notePriceScale(scale);
+    }
+    return scale;
   }
 }

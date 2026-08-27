@@ -167,16 +167,18 @@ final class RequestSummaryPage {
     }
     if (request.order() != null) {
       var order = request.order();
+      int scale = marketPriceScale(order.marketId());
       lines.add(messages.component(player, "ui-confirm-side", order.side()));
       lines.add(messages.component(player, "ui-confirm-quantity", order.quantity()));
       addQuantityLimitLine(lines, player, order);
       if (order.price() != null) {
-        lines.add(messages.component(player, "ui-confirm-price", order.price().toPlainString()));
+        lines.add(messages.component(player, "ui-confirm-price",
+            messages.formatCurrency(order.price(), scale)));
         lines.add(messages.component(player, "ui-confirm-estimated-notional",
-            OrderConfirmation.estimatedNotional(order.price(), order.quantity()).toPlainString()));
+            messages.formatCurrency(OrderConfirmation.estimatedNotional(order.price(), order.quantity()), scale)));
         if (order.side() == OrderSide.BUY) {
           lines.add(messages.component(player, "ui-confirm-frozen-estimate",
-              frozenEstimate(order, order.price()).toPlainString()));
+              messages.formatCurrency(frozenEstimate(order, order.price()), scale)));
         }
         addFeeLines(lines, player, order, order.price(), quote);
         if (quote != null) {
@@ -184,7 +186,7 @@ final class RequestSummaryPage {
               ? quote.bestAsk() : quote.bestBid();
           if (executable != null) {
             lines.add(messages.component(player, "ui-confirm-current-quote",
-                executable.toPlainString()));
+                messages.formatCurrency(executable, scale)));
             boolean crosses = order.side() == OrderSide.BUY
                 ? order.price().compareTo(executable) >= 0
                 : order.price().compareTo(executable) <= 0;
@@ -194,14 +196,15 @@ final class RequestSummaryPage {
         }
       }
       if (order.slippageBoundary() != null) {
+        int boundaryScale = marketPriceScale(order.marketId());
         lines.add(messages.component(player, "ui-confirm-protection",
-            order.slippageBoundary().toPlainString()));
+            messages.formatCurrency(order.slippageBoundary(), boundaryScale)));
         lines.add(messages.component(player, "ui-confirm-estimated-notional",
-            OrderConfirmation.estimatedNotional(order.slippageBoundary(), order.quantity())
-                .toPlainString()));
+            messages.formatCurrency(OrderConfirmation.estimatedNotional(
+                order.slippageBoundary(), order.quantity()), boundaryScale)));
         if (order.side() == OrderSide.BUY) {
           lines.add(messages.component(player, "ui-confirm-frozen-estimate",
-              frozenEstimate(order, order.slippageBoundary()).toPlainString()));
+              messages.formatCurrency(frozenEstimate(order, order.slippageBoundary()), boundaryScale)));
         }
         addFeeLines(lines, player, order, order.slippageBoundary(), quote);
         if (quote != null) {
@@ -257,9 +260,10 @@ final class RequestSummaryPage {
     lines.add(messages.component(player, "ui-confirm-quantity-limit",
         rules.minQuantity(), rules.maxQuantity()));
     lines.add(messages.component(player, "ui-confirm-price-limit",
-        rules.minPrice().toPlainString(), rules.maxPrice().toPlainString()));
+        messages.formatCurrency(rules.minPrice(), rules.priceScale()),
+        messages.formatCurrency(rules.maxPrice(), rules.priceScale())));
     lines.add(messages.component(player, "ui-confirm-tick-size",
-        rules.tickSize().toPlainString()));
+        messages.formatCurrency(rules.tickSize(), rules.priceScale())));
   }
 
   private void addFeeLines(List<Component> lines, Player player, ExchangeMenuRequest.OrderDraft order,
@@ -277,13 +281,14 @@ final class RequestSummaryPage {
         ? rules.takerFeeRate() : feeRateForLimit(order, boundary, quote, rules);
     java.math.BigDecimal notional = OrderConfirmation.estimatedNotional(boundary, order.quantity());
     java.math.BigDecimal fee = notional.multiply(rate)
-        .setScale(2, java.math.RoundingMode.HALF_UP);
+        .setScale(rules.priceScale(), java.math.RoundingMode.HALF_UP);
     lines.add(messages.component(player, "ui-confirm-fee-rate",
         rate.multiply(java.math.BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString()));
-    lines.add(messages.component(player, "ui-confirm-estimated-fee", fee.toPlainString()));
+    lines.add(messages.component(player, "ui-confirm-estimated-fee",
+        messages.formatCurrency(fee, rules.priceScale())));
     if (order.side() == OrderSide.SELL) {
       lines.add(messages.component(player, "ui-confirm-estimated-net",
-          notional.subtract(fee).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()));
+          messages.formatCurrency(notional.subtract(fee), rules.priceScale())));
     }
   }
 
@@ -319,8 +324,20 @@ final class RequestSummaryPage {
     var rules = market.service().marketRules();
     java.math.BigDecimal maximumRate = rules.makerFeeRate().max(rules.takerFeeRate());
     java.math.BigDecimal fee = notional.multiply(maximumRate)
-        .setScale(2, java.math.RoundingMode.UP);
+        .setScale(rules.priceScale(), java.math.RoundingMode.UP);
     return notional.add(fee);
+  }
+
+  private int marketPriceScale(String marketId) {
+    if (views == null) {
+      return -1;
+    }
+    ExchangeViewService.MarketView market = views.market(marketId);
+    int scale = market == null ? -1 : market.service().marketRules().priceScale();
+    if (scale >= 0) {
+      messages.notePriceScale(scale);
+    }
+    return scale;
   }
 
   private void submit(ExchangeMenuRequest request, UUID playerId) {

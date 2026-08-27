@@ -94,20 +94,21 @@ final class MarketListPage {
     int end = Math.min(sorted.size(), start + MARKET_PAGE_SIZE);
     for (MarketRow row : sorted.subList(start, end)) {
       if (slot >= 45) break;
-      String bid = row.bestBid() == null ? "-" : row.bestBid().toPlainString();
-      String ask = row.bestAsk() == null ? "-" : row.bestAsk().toPlainString();
+      int scale = priceScale(row);
+      String bid = row.bestBid() == null ? "-" : messages.formatCurrency(row.bestBid(), scale);
+      String ask = row.bestAsk() == null ? "-" : messages.formatCurrency(row.bestAsk(), scale);
       List<Component> lore = new ArrayList<>(List.of(
           messages.component(player, "ui-market-last", row.lastPrice() == null ? "-"
-              : row.lastPrice().toPlainString()),
+              : messages.formatCurrency(row.lastPrice(), scale)),
           messages.component(player, "ui-market-bid-ask", bid, ask),
           messages.component(player, "ui-market-volume", row.volume24h()),
           messages.component(player, "ui-market-list-notional",
               row.notional24h() == null ? "-"
-                  : row.notional24h().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()),
+                  : messages.formatCurrency(row.notional24h(), scale)),
           messages.component(player, "ui-market-status", row.status().name())));
       for (MarketRow.TradeLore trade : row.recentTrades()) {
         Component tradeLine = messages.component(player, "ui-market-last-trade",
-            trade.buy() ? trade.side() : "SELL", trade.price().toPlainString(),
+            trade.buy() ? trade.side() : "SELL", messages.formatCurrency(trade.price(), scale),
             trade.quantity());
         tradeLine = tradeLine.color(trade.buy()
             ? net.kyori.adventure.text.format.NamedTextColor.GREEN
@@ -133,7 +134,7 @@ final class MarketListPage {
         if ("VIRTUAL_SECURITY".equals(row.assetType()) && row.lastPrice() != null) {
           lore.add(messages.component(player, "ui-market-float-cap",
               row.lastPrice().multiply(java.math.BigDecimal.valueOf(row.issuedSupply()))
-                  .setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()));
+                  .setScale(scale, java.math.RoundingMode.HALF_UP).toPlainString()));
         }
       }
       Component changeLine = messages.component(player, "ui-market-change-percent",
@@ -243,7 +244,7 @@ final class MarketListPage {
             messages.component(player, "ui-overview-volume", overview.totalVolume24h()),
             messages.component(player, "ui-overview-notional",
                 overview.totalNotional24h()
-                    .setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()),
+                    .setScale(messages.lastPriceScale(), java.math.RoundingMode.HALF_UP).toPlainString()),
             messages.component(player, "ui-overview-active", active),
             messages.component(player, "ui-overview-gainer", gainer),
             messages.component(player, "ui-overview-loser", loser)))).withSlot(4).build());
@@ -254,6 +255,15 @@ final class MarketListPage {
         : fraction.multiply(java.math.BigDecimal.valueOf(100))
             .setScale(2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
             + "%";
+  }
+
+  private int priceScale(MarketRow row) {
+    ExchangeViewService.MarketView market = views.market(row.marketId());
+    int scale = market == null ? -1 : market.service().marketRules().priceScale();
+    if (scale >= 0) {
+      messages.notePriceScale(scale);
+    }
+    return scale;
   }
 
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,

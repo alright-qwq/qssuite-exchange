@@ -266,13 +266,14 @@ public final class ExchangeViewService {
             market.totalSupply(), securityStatus(securities, market.marketId()),
             issuedSupply(securities, market),
             recentTrades(market.marketId()));
+        int scale = market.service().marketRules().priceScale();
         MarketRow row = presenter.rows(List.of(entry)).getFirst();
         if (row.notional24h() != null) {
           row = new MarketRow(row.marketId(), row.displayName(), row.lastPrice(),
               row.bestBid(), row.bestAsk(), row.change24h(), row.volume24h(), row.status(),
               row.assetType(), row.symbol(), row.totalSupply(), row.securityStatus(),
               row.volatility24h(), row.high24h(), row.low24h(), row.issuedSupply(),
-              row.notional24h().setScale(2, RoundingMode.HALF_UP), row.recentTrades());
+              row.notional24h().setScale(scale, RoundingMode.HALF_UP), row.recentTrades());
         }
         Instant asOf = book.asOf();
         List<com.ghostchu.quickshop.addon.exchange.marketdata.Candle> candles =
@@ -284,7 +285,7 @@ public final class ExchangeViewService {
         ExchangeRepository.MarketTradeSummary tradeSummary = repository == null ? null
             : repository.marketTradeSummary(marketId, asOf.minus(Duration.ofHours(24)));
         BigDecimal notional = quote.notional24h() == null ? null
-            : quote.notional24h().setScale(2, RoundingMode.HALF_UP);
+            : quote.notional24h().setScale(scale, RoundingMode.HALF_UP);
         return new MarketDashboardSnapshot(row, candles, book.bids(), book.asks(), spread,
             spreadPercent(spread, quote.bestBid(), quote.bestAsk()), notional,
             recentTrades, tradeSummary);

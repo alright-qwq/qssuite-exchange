@@ -107,23 +107,24 @@ final class MarketDetailPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     MarketRow row = dashboard.market();
-    String bid = row.bestBid() == null ? "-" : row.bestBid().toPlainString();
-    String ask = row.bestAsk() == null ? "-" : row.bestAsk().toPlainString();
-    String spread = dashboard.spread() == null ? "-" : dashboard.spread().toPlainString();
+    int scale = marketPriceScale(row.marketId());
+    String bid = row.bestBid() == null ? "-" : messages.formatCurrency(row.bestBid(), scale);
+    String ask = row.bestAsk() == null ? "-" : messages.formatCurrency(row.bestAsk(), scale);
+    String spread = dashboard.spread() == null ? "-" : messages.formatCurrency(dashboard.spread(), scale);
     String spreadPercent = percent(dashboard.spreadPercent());
     java.util.ArrayList<Component> lore = new java.util.ArrayList<>(List.of(
         messages.component(player, "ui-market-last", row.lastPrice() == null ? "-"
-            : row.lastPrice().toPlainString()),
+            : messages.formatCurrency(row.lastPrice(), scale)),
         messages.component(player, "ui-market-bid", bid),
         messages.component(player, "ui-market-ask", ask),
         messages.component(player, "ui-market-spread", spread, spreadPercent),
         messages.component(player, "ui-market-change-percent", percent(row.change24h()))
             .color(changeColor(row.change24h())),
-        messages.component(player, "ui-market-notional", notional(dashboard)),
+        messages.component(player, "ui-market-notional", notional(dashboard, scale)),
         messages.component(player, "ui-market-volatility", percent(row.volatility24h())),
         messages.component(player, "ui-market-high-low",
-            row.high24h() == null ? "-" : row.high24h().toPlainString(),
-            row.low24h() == null ? "-" : row.low24h().toPlainString()),
+            row.high24h() == null ? "-" : messages.formatCurrency(row.high24h(), scale),
+            row.low24h() == null ? "-" : messages.formatCurrency(row.low24h(), scale)),
         messages.component(player, "ui-market-volume", row.volume24h()),
         messages.component(player, "ui-market-status", row.status().name())));
     if (row.assetType() != null) {
@@ -142,7 +143,7 @@ final class MarketDetailPage {
         java.math.BigDecimal floatCap = row.lastPrice().multiply(
             java.math.BigDecimal.valueOf(row.issuedSupply()));
         lore.add(messages.component(player, "ui-market-float-cap",
-            floatCap.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()));
+            messages.formatCurrency(floatCap, scale)));
       }
     }
     if (row.securityStatus() != null) {
@@ -162,8 +163,8 @@ final class MarketDetailPage {
     MarketDashboardPresenter.DashboardRows rows = presenter.present(dashboard, window);
     addExecutableDepthSummary(page, player, rows);
     renderDepth(page, player, rows, row);
-    renderCandles(page, player, rows);
-    renderRecentTrades(page, player, dashboard);
+    renderCandles(page, player, rows, row);
+    renderRecentTrades(page, player, dashboard, row);
     addOrderIcon(page, player, row, OrderSide.BUY, OrderType.LIMIT, "LIME_CONCRETE", 29,
         "ui-order-limit-buy", ActionType.LEFT_CLICK);
     addOrderIcon(page, player, row, OrderSide.SELL, OrderType.LIMIT, "RED_CONCRETE", 33,
@@ -300,13 +301,14 @@ final class MarketDetailPage {
     }
     String material = row.executable() ? (bid ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE")
         : "GRAY_STAINED_GLASS_PANE";
+    int scale = marketPriceScale(market.marketId());
     java.util.ArrayList<Component> lore = new java.util.ArrayList<>(List.of(
-        messages.component(player, "ui-depth-price", row.price().toPlainString()),
+        messages.component(player, "ui-depth-price", messages.formatCurrency(row.price(), scale)),
         messages.component(player, "ui-depth-quantity", row.quantity()),
         messages.component(player, "ui-depth-cumulative", row.cumulativeQuantity()),
         messages.component(player, "ui-depth-notional",
             row.price().multiply(java.math.BigDecimal.valueOf(row.quantity()))
-                .stripTrailingZeros().toPlainString()),
+                .setScale(scale, java.math.RoundingMode.HALF_UP).toPlainString()),
         messages.component(player, row.executable() ? "ui-depth-executable" : "ui-depth-protected")));
     java.math.BigDecimal distance = distancePercent(row.price(), market.lastPrice());
     if (distance != null) {
@@ -318,7 +320,8 @@ final class MarketDetailPage {
   }
 
   private void renderCandles(PlayerInstancePage page, Player player,
-                             MarketDashboardPresenter.DashboardRows rows) {
+                             MarketDashboardPresenter.DashboardRows rows, MarketRow market) {
+    int scale = marketPriceScale(market.marketId());
     for (int index = 0; index < rows.candles().size(); index++) {
       MarketDashboardPresenter.CandleRow row = rows.candles().get(index);
       int slot = 19 + index;
@@ -341,10 +344,14 @@ final class MarketDetailPage {
               .divide(candle.open(), 2, java.math.RoundingMode.HALF_UP).stripTrailingZeros();
       List<Component> lore = new java.util.ArrayList<>(List.of(
           messages.component(player, "ui-trend-time", candle.bucketStart().toString()),
-          messages.component(player, "ui-trend-open", candle.open().toPlainString()),
-          messages.component(player, "ui-trend-high", candle.high().toPlainString()),
-          messages.component(player, "ui-trend-low", candle.low().toPlainString()),
-          messages.component(player, "ui-trend-close", candle.close().toPlainString()),
+          messages.component(player, "ui-trend-open",
+              messages.formatCurrency(candle.open(), scale)),
+          messages.component(player, "ui-trend-high",
+              messages.formatCurrency(candle.high(), scale)),
+          messages.component(player, "ui-trend-low",
+              messages.formatCurrency(candle.low(), scale)),
+          messages.component(player, "ui-trend-close",
+              messages.formatCurrency(candle.close(), scale)),
           messages.component(player, "ui-trend-change", change.stripTrailingZeros().toPlainString(),
               changePercent.toPlainString()),
           messages.component(player, "ui-trend-volume", candle.volume())));
@@ -373,7 +380,8 @@ final class MarketDetailPage {
   }
 
   private void renderRecentTrades(PlayerInstancePage page, Player player,
-                                  MarketDashboardSnapshot dashboard) {
+                                  MarketDashboardSnapshot dashboard, MarketRow market) {
+    int scale = marketPriceScale(market.marketId());
     List<ExchangeRepository.MarketTradeRow> trades = dashboard.recentTrades();
     if (trades.isEmpty()) {
       page.addIcon(player.getUniqueId(), new IconBuilder(
@@ -395,7 +403,8 @@ final class MarketDetailPage {
           messages.component(player, "ui-market-recent-trade-quantity", trade.quantity()),
           messages.component(player, "ui-market-recent-trade-notional",
               trade.price().multiply(java.math.BigDecimal.valueOf(trade.quantity()))
-                  .stripTrailingZeros().toPlainString()),
+                  .setScale(scale, java.math.RoundingMode.HALF_UP)
+                  .toPlainString()),
           messages.component(player, "ui-market-recent-trade-time",
               messages.relativeTime(trade.executedAt())));
       page.addIcon(player.getUniqueId(), new IconBuilder(
@@ -403,7 +412,7 @@ final class MarketDetailPage {
               .customName(messages.component(player, "ui-market-recent-trade-title",
                   buy ? messages.text(player, "ui-market-recent-active-buy")
                       : messages.text(player, "ui-market-recent-active-sell"),
-                  trade.price().toPlainString()))
+                  messages.formatCurrency(trade.price(), scale)))
               .lore(lore)).withSlot(slot).build());
     }
     addNavigation(page, player, 53, "ARROW", "ui-market-recent-more",
@@ -441,9 +450,18 @@ final class MarketDetailPage {
         : net.kyori.adventure.text.format.NamedTextColor.YELLOW;
   }
 
-  private static String notional(MarketDashboardSnapshot dashboard) {
+  private String notional(MarketDashboardSnapshot dashboard, int scale) {
     return dashboard.notional24h() == null ? "-"
-        : dashboard.notional24h().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+        : messages.formatCurrency(dashboard.notional24h(), scale);
+  }
+
+  private int marketPriceScale(String marketId) {
+    ExchangeViewService.MarketView market = views.market(marketId);
+    int scale = market == null ? -1 : market.service().marketRules().priceScale();
+    if (scale >= 0) {
+      messages.notePriceScale(scale);
+    }
+    return scale;
   }
 
   private static java.math.BigDecimal distancePercent(java.math.BigDecimal price,

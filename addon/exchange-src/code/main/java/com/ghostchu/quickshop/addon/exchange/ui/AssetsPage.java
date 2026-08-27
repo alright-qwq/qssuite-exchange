@@ -94,8 +94,10 @@ final class AssetsPage {
       if (slot >= 21) break;
       TransferTarget target = row.target();
       List<Component> lore = List.of(
-          messages.component(player, "ui-assets-available", row.available().toPlainString()),
-          messages.component(player, "ui-assets-frozen", row.frozen().toPlainString()),
+          messages.component(player, "ui-assets-available",
+              messages.formatCurrency(row.available())),
+          messages.component(player, "ui-assets-frozen",
+              messages.formatCurrency(row.frozen())),
           messages.component(player, "ui-assets-deposit-action"),
           messages.component(player, "ui-assets-withdraw-action"));
       IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of(
@@ -124,7 +126,7 @@ final class AssetsPage {
       java.math.BigDecimal marketValue = marketValue(security, snapshot.quotes());
       if (marketValue != null) {
         securityLore.add(messages.component(player, "ui-assets-market-value",
-            marketValue.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()));
+            messages.formatCurrency(marketValue, marketPriceScale(security.marketId()))));
       }
       IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of("EMERALD", 1)
           .customName(Component.text(security.displayName())).lore(securityLore));
@@ -150,7 +152,7 @@ final class AssetsPage {
           messages.component(player, "ui-assets-transfer-kind",
               transfer.type(), transfer.assetId()),
           messages.component(player, "ui-assets-transfer-amount",
-              transfer.amount().toPlainString()),
+              messages.formatCurrency(transfer.amount())),
           messages.component(player, "ui-assets-transfer-status",
               transfer.status() + reason),
           messages.component(player, "ui-history-created-at",
@@ -195,6 +197,12 @@ final class AssetsPage {
 
   private void addTotalValue(PlayerInstancePage page, Player player, UUID playerId,
                              AssetPageRows.Merged merged, AssetPageSnapshot snapshot) {
+    // Aggregate values span markets; record the latest market scale for stable formatting.
+    if (!merged.rows().isEmpty()) {
+      marketPriceScale(merged.rows().getFirst().target().marketId());
+    } else if (!merged.securities().isEmpty()) {
+      marketPriceScale(merged.securities().getFirst().marketId());
+    }
     java.math.BigDecimal total = java.math.BigDecimal.ZERO;
     java.math.BigDecimal frozen = java.math.BigDecimal.ZERO;
     for (AssetPageRows.Row row : merged.rows()) {
@@ -211,10 +219,10 @@ final class AssetsPage {
     }
     java.util.List<Component> lore = new java.util.ArrayList<>(List.of(
         messages.component(player, "ui-assets-total-value-amount",
-            total.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())));
+            messages.formatCurrency(total))));
     if (frozen.signum() > 0) {
       lore.add(messages.component(player, "ui-assets-total-value-frozen",
-          frozen.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()));
+          messages.formatCurrency(frozen)));
     }
     page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("DIAMOND", 1)
         .customName(messages.component(player, "ui-assets-total-value")).lore(lore))
@@ -233,6 +241,18 @@ final class AssetsPage {
     }
     java.math.BigDecimal quantity = security.available().add(security.frozen());
     return quote.lastPrice().multiply(quantity);
+  }
+
+  private int marketPriceScale(String marketId) {
+    if (marketId == null) {
+      return -1;
+    }
+    ExchangeViewService.MarketView market = views.market(marketId);
+    int scale = market == null ? -1 : market.service().marketRules().priceScale();
+    if (scale >= 0) {
+      messages.notePriceScale(scale);
+    }
+    return scale;
   }
 
   private void addMarketsNavigation(PlayerInstancePage page, Player player) {
