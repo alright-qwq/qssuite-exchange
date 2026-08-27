@@ -51,6 +51,18 @@ class AdminCommandRouterTest {
   }
 
   @Test
+  void containsErrorsThrownWhileHandlingAdminCommands() {
+    Actor actor = new Actor("quickshop.exchange.admin.orders");
+    actor.failPermissionWith = new LinkageError("shaded admin class conflict");
+    AdminCommandRouter router = new AdminCommandRouter(new AdminExchangeService(
+        Map.of()), UUID::randomUUID);
+
+    router.execute(actor, new String[] {"order", "cancel", "missing", "reason"});
+
+    assertThat(actor.message).isEqualTo("admin-command-failed");
+  }
+
+  @Test
   void pausesAndResumesMarketsWithTheDedicatedMarketPermission() throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
     AdminCommandRouter router = new AdminCommandRouter(new AdminExchangeService(
@@ -308,13 +320,19 @@ class AdminCommandRouterTest {
     private final Set<String> permissions = new HashSet<>();
     private String message;
     private Object[] arguments = new Object[0];
+    private Error failPermissionWith;
 
     private Actor(String... permissions) {
       this.permissions.addAll(Set.of(permissions));
     }
 
     @Override public UUID accountId() { return accountId; }
-    @Override public boolean hasPermission(String permission) { return permissions.contains(permission); }
+    @Override public boolean hasPermission(String permission) {
+      if (failPermissionWith != null) {
+        throw failPermissionWith;
+      }
+      return permissions.contains(permission);
+    }
     @Override public void message(String key, Object... arguments) {
       message = key;
       this.arguments = arguments;

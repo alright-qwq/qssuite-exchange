@@ -77,7 +77,9 @@ public final class AdminCommandRouter {
         return;
       }
       actor.message("admin-command-invalid");
-    } catch (RuntimeException failure) {
+    } catch (Throwable failure) {
+      // Catch Throwable (not just RuntimeException) so linkage/classloading errors cannot escape
+      // the admin command pipeline either; report and keep the plugin usable.
       LOGGER.log(java.util.logging.Level.SEVERE,
           "Exchange admin command failed for account " + actor.accountId(), failure);
       actor.message("admin-command-failed");
