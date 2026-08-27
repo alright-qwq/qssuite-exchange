@@ -130,6 +130,26 @@ class MarketRegistryTest {
   }
 
   @Test
+  void feeReloadPersistsTheNewVersionForTheRepositoryBoundary() {
+    java.util.List<Map<String, MarketConfigurationPersistence.State>> persisted =
+        new java.util.ArrayList<>();
+    MarketRegistry registry = new MarketRegistry(Map.of(
+        "minecraft_diamond/default", definition("0.01", "0.001", "0.002")),
+        persisted::add);
+
+    registry.reload(Map.of("minecraft_diamond/default",
+        definition("0.01", "0.010", "0.020")),
+        market -> new MarketStateReader.State(MarketStatus.OPEN, 3));
+
+    assertThat(persisted).hasSize(1);
+    MarketConfigurationPersistence.State state =
+        persisted.getFirst().get("minecraft_diamond/default");
+    assertThat(state.activeFeeVersion()).isEqualTo(2);
+    assertThat(state.feeVersions().get(2L).makerRate()).isEqualByComparingTo("0.010");
+    assertThat(state.feeVersions().get(2L).takerRate()).isEqualByComparingTo("0.020");
+  }
+
+  @Test
   void blocksOnlyNewContainerShopsForConfiguredVanillaMaterials() {
     MarketDefinition protectedDiamond = new MarketDefinition("diamond", "Diamond", false,
         new MarketDefinition.ItemDefinition(FingerprintMode.VANILLA_MATERIAL, "DIAMOND", null, null),

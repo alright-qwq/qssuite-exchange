@@ -259,12 +259,12 @@ public final class ExchangeRuntimeFactory {
     this.maintenance.scheduleWithFixedDelay(resumeHalted, 1L, 1L, TimeUnit.MINUTES);
     this.maintenance.scheduleWithFixedDelay(() -> flushWhileOwned(
         database.writer(), marketData, Instant.now()), 1L, 1L, TimeUnit.MINUTES);
-    java.util.List<String> marketIds = java.util.List.copyOf(registry.marketIds());
     this.candleRetentionDays = Math.max(1, addon.getConfig().getInt(
         "market-data.candle-retention-days", 365));
     this.maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
         database.writer(), () -> marketData.purgeOldCandles(
-            java.time.Duration.ofDays(candleRetentionDays), marketIds)),
+            java.time.Duration.ofDays(candleRetentionDays),
+            java.util.List.copyOf(this.registry.marketIds()))),
         30L, 24L * 60L, TimeUnit.MINUTES);
     this.reconciliationIntervalMinutes = addon.getConfig().getInt(
         "operations.reconciliation-interval-minutes", 1440);
@@ -314,6 +314,10 @@ public final class ExchangeRuntimeFactory {
     File reloadMarkets = new File(addon.getDataFolder(), "markets.yml");
     MarketRegistry reloaded;
     try {
+      // Reload must not restore persisted versions onto the freshly parsed definitions: the live
+      // registry already carries the current versions and its own repository persistence, so the
+      // reload below persists any version bump. Restoring here would reject legitimate fee/risk
+      // changes whose persisted active rate still matches the old file.
       reloaded = MarketRegistry.load(reloadConfig, reloadMarkets);
     } catch (IllegalArgumentException configurationFailure) {
       throw new IllegalArgumentException(
