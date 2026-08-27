@@ -97,6 +97,7 @@ public final class Main extends JavaPlugin implements Listener {
   private void cleanupAfterFailedStart() {
     ExchangeRuntime failedRuntime = runtime;
     runtime = null;
+    runtimeFactory = null;
     mainListenerRegistered = false;
     ShutdownSequence.close(this::unregisterPlayerEntrypoints,
         () -> {
