@@ -356,15 +356,22 @@ final class RequestSummaryPage {
         if (failure != null) {
           onlinePlayer.sendMessage(messages.component(onlinePlayer, "ui-confirm-submit-failed"));
         } else {
-          String key = switch (result.outcome()) {
-            case ACCEPTED -> "ui-confirm-submit-accepted";
-            case REVIEW_REQUIRED -> "ui-confirm-submit-review";
-            case REJECTED -> "ui-confirm-submit-rejected";
-            case FAILED -> "ui-confirm-submit-failed-outcome";
-          };
-          String reason = result.reason() == null ? "" : result.reason();
-          onlinePlayer.sendMessage(messages.component(onlinePlayer, key,
-              result.reference(), reason));
+          String reason = messages.reasonText(onlinePlayer, result.reason());
+          if (result.outcome() == ExchangeRequestSubmitter.Outcome.ACCEPTED) {
+            onlinePlayer.sendMessage(messages.component(onlinePlayer,
+                "ui-confirm-submit-accepted", result.reference()));
+          } else if (result.outcome() == ExchangeRequestSubmitter.Outcome.REVIEW_REQUIRED) {
+            onlinePlayer.sendMessage(messages.component(onlinePlayer,
+                "ui-confirm-submit-review", result.reference(), reason));
+          } else if (result.outcome() == ExchangeRequestSubmitter.Outcome.REJECTED) {
+            onlinePlayer.sendMessage(messages.component(onlinePlayer,
+                reason.isEmpty() ? "ui-confirm-submit-rejected-no-reason"
+                    : "ui-confirm-submit-rejected", result.reference(), reason));
+          } else {
+            onlinePlayer.sendMessage(messages.component(onlinePlayer,
+                reason.isEmpty() ? "ui-confirm-submit-failed-no-reason"
+                    : "ui-confirm-submit-failed-outcome", result.reference(), reason));
+          }
           navigateAfterSubmit(onlinePlayer, request, result);
         }
       }, 1L);

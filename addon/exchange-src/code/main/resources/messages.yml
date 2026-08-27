@@ -219,7 +219,18 @@ en-US:
   ui-confirm-submit-accepted: 'Exchange request accepted: <0>'
   ui-confirm-submit-review: 'Transfer <0> needs administrator review: <1>'
   ui-confirm-submit-rejected: 'Exchange request rejected: <0> (<1>)'
+  ui-confirm-submit-rejected-no-reason: 'Exchange request rejected: <0>'
   ui-confirm-submit-failed-outcome: 'Exchange request failed: <0> (<1>)'
+  ui-confirm-submit-failed-no-reason: 'Exchange request failed: <0>'
+  ui-reject-market-not-open: This market is not accepting new orders right now.
+  ui-reject-rate-limited: You are placing orders too quickly. Please wait a moment.
+  ui-reject-price-outside-cage: The price is outside the allowed protection range.
+  ui-reject-slippage-too-high: The slippage protection price is too far from the current market price.
+  ui-reject-holding-limit: You have reached the maximum holding for this asset.
+  ui-reject-frozen-limit: You have reached the maximum frozen balance for this currency.
+  ui-reject-open-order-limit: You have reached the maximum number of open orders.
+  ui-reject-self-trade: The order would trade against your own order. Adjust the price.
+  ui-reject-fallback: 'Request rejected: <0>'
   ui-confirm-back-market: Back to market
   ui-admin-market: Market controls
   ui-admin-market-usage: '/qse admin market pause <market> <reason>'
@@ -452,7 +463,18 @@ zh-CN:
   ui-confirm-submit-accepted: '交易所请求已受理：<0>'
   ui-confirm-submit-review: '转账 <0> 需要管理员审核：<1>'
   ui-confirm-submit-rejected: '交易所请求被拒绝：<0>（<1>）'
+  ui-confirm-submit-rejected-no-reason: '交易所请求被拒绝：<0>'
   ui-confirm-submit-failed-outcome: '交易所请求处理失败：<0>（<1>）'
+  ui-confirm-submit-failed-no-reason: '交易所请求处理失败：<0>'
+  ui-reject-market-not-open: 该市场当前不接受新订单。
+  ui-reject-rate-limited: 你下单太频繁了，请稍等片刻再试。
+  ui-reject-price-outside-cage: 价格超出允许的保护范围。
+  ui-reject-slippage-too-high: 滑点保护价距离当前市场价太远。
+  ui-reject-holding-limit: 你已持有该资产的最大数量。
+  ui-reject-frozen-limit: 该货币的冻结资金已达上限。
+  ui-reject-open-order-limit: 你的挂单数量已达上限。
+  ui-reject-self-trade: 该订单会与自己的订单成交，请调整价格。
+  ui-reject-fallback: '请求被拒绝：<0>'
   ui-confirm-back-market: 返回市场
   ui-admin-market: 市场控制
   ui-admin-market-usage: '/qse admin market pause <市场> <原因>'

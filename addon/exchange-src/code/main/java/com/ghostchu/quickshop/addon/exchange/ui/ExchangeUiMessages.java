@@ -40,6 +40,36 @@ final class ExchangeUiMessages {
     return value.setScale(scale, RoundingMode.HALF_UP).toPlainString();
   }
 
+  /** Localizes a rejection/error reason for the player, falling back to the raw reason. */
+  String reasonText(Player player, String rawReason) {
+    return localizeReason(messages, player.locale(), rawReason);
+  }
+
+  /** Pure reason localization used by the player-facing adapter and tests. */
+  static String localizeReason(AddonMessageService messages, Locale locale, String rawReason) {
+    if (rawReason == null || rawReason.isBlank()) {
+      return "";
+    }
+    String key = switch (rawReason.toUpperCase(Locale.ROOT)) {
+      case "MARKET_NOT_OPEN" -> "ui-reject-market-not-open";
+      case "RATE_LIMITED" -> "ui-reject-rate-limited";
+      case "PRICE_OUTSIDE_CAGE" -> "ui-reject-price-outside-cage";
+      case "SLIPPAGE_TOO_HIGH" -> "ui-reject-slippage-too-high";
+      case "HOLDING_LIMIT" -> "ui-reject-holding-limit";
+      case "FROZEN_LIMIT" -> "ui-reject-frozen-limit";
+      case "OPEN_ORDER_LIMIT" -> "ui-reject-open-order-limit";
+      case "SELF_TRADE" -> "ui-reject-self-trade";
+      default -> null;
+    };
+    if (key != null) {
+      String localized = messages.message(key, locale);
+      if (!localized.equals(key)) {
+        return localized;
+      }
+    }
+    return messages.message("ui-reject-fallback", locale, rawReason);
+  }
+
   /** Records the latest price scale observed by a page render for aggregate displays. */
   void notePriceScale(int priceScale) {
     lastPriceScale = priceScale;

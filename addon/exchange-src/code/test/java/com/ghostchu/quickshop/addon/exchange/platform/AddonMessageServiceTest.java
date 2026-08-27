@@ -40,5 +40,9 @@ class AddonMessageServiceTest {
     assertThat(messages.message("ui-confirm-submit-rejected",
         Locale.forLanguageTag("zh-CN"), "order-1", "RATE_LIMITED"))
         .isEqualTo("交易所请求被拒绝：order-1（RATE_LIMITED）");
+    assertThat(messages.message("ui-reject-rate-limited", Locale.forLanguageTag("zh-CN")))
+        .isEqualTo("你下单太频繁了，请稍等片刻再试。");
+    assertThat(messages.message("ui-reject-market-not-open", Locale.US))
+        .isEqualTo("This market is not accepting new orders right now.");
   }
 }
