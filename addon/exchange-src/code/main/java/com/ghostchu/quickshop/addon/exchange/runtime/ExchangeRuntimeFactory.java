@@ -87,6 +87,8 @@ public final class ExchangeRuntimeFactory {
     Database database = database();
     this.database = database;
     database.writer().acquire();
+    ScheduledExecutorService maintenance = null;
+    ScheduledExecutorService uiMaintenance = null;
     try {
       TableNames tables = new TableNames(quickShop.getDbPrefix());
       File marketsFile = new File(addon.getDataFolder(), "markets.yml");
@@ -164,8 +166,12 @@ public final class ExchangeRuntimeFactory {
     Bukkit.getPluginManager().registerEvents(new ContainerShopPolicyListener(registry), addon);
 
     AutoCloseable dispatcher = () -> {};
-    ScheduledExecutorService maintenance = Executors.newSingleThreadScheduledExecutor(
+    maintenance = Executors.newSingleThreadScheduledExecutor(
         Thread.ofPlatform().daemon(true).name("qs-exchange-maintenance-", 0).factory());
+    // UI refreshes and view reads run on their own pool so a slow maintenance scan (detection,
+    // reconciliation, candle purge) can never stall player GUI updates.
+    uiMaintenance = Executors.newScheduledThreadPool(2,
+        Thread.ofPlatform().daemon(true).name("qs-exchange-ui-", 0).factory());
     Map<String, ExchangeViewService.MarketView> marketViews = new java.util.LinkedHashMap<>();
     Map<String, com.ghostchu.quickshop.addon.exchange.ui.TransferTarget> transferTargets =
         new java.util.LinkedHashMap<>();
@@ -213,7 +219,7 @@ public final class ExchangeRuntimeFactory {
       }
     }
     long guiRefreshMs = Math.max(250L, addon.getConfig().getLong("market-data.gui-refresh-ms", 1000));
-    ExchangeViewService views = new ExchangeViewService(marketViews, marketData, maintenance,
+    ExchangeViewService views = new ExchangeViewService(marketViews, marketData, uiMaintenance,
         repository, java.util.List.copyOf(transferTargets.values()),
         java.time.Duration.ofMillis(guiRefreshMs));
     this.views = views;
@@ -268,14 +274,17 @@ public final class ExchangeRuntimeFactory {
             }
           }), 15L, reconciliationIntervalMinutes, TimeUnit.MINUTES);
     }
-    maintenance.scheduleWithFixedDelay(marketData::publishPlayerUpdates,
+    uiMaintenance.scheduleWithFixedDelay(marketData::publishPlayerUpdates,
         1L, 1L, TimeUnit.SECONDS);
+    final ScheduledExecutorService maintenanceForClose = maintenance;
+    final ScheduledExecutorService uiMaintenanceForClose = uiMaintenance;
 
       ExchangeRuntime runtime = new ExchangeRuntime(database.writer(),
           () -> recoverMarkets(markets), transfers::recoverAllMoneyTransfers, dispatcher,
           lockLossFence(),
           () -> {
-            maintenance.shutdownNow();
+            maintenanceForClose.shutdownNow();
+            uiMaintenanceForClose.shutdownNow();
             recoveryFenceExecutor.close();
             recoveryExecutor.close();
             playerOperations.close();
@@ -286,6 +295,12 @@ public final class ExchangeRuntimeFactory {
               recoveryFenceExecutor)), addon);
       return runtime;
     } catch (Exception failure) {
+      if (maintenance != null) {
+        maintenance.shutdownNow();
+      }
+      if (uiMaintenance != null) {
+        uiMaintenance.shutdownNow();
+      }
       database.writer().close();
       throw failure;
     }
