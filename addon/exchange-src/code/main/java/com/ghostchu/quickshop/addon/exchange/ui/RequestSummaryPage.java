@@ -319,7 +319,7 @@ final class RequestSummaryPage {
     var rules = market.service().marketRules();
     java.math.BigDecimal maximumRate = rules.makerFeeRate().max(rules.takerFeeRate());
     java.math.BigDecimal fee = notional.multiply(maximumRate)
-        .setScale(2, java.math.RoundingMode.HALF_UP);
+        .setScale(2, java.math.RoundingMode.UP);
     return notional.add(fee);
   }
 
