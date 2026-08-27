@@ -61,6 +61,16 @@ public final class Main extends JavaPlugin implements Listener {
       registerPlayerEntrypoints();
       Bukkit.getPluginManager().registerEvents(this, this);
     } catch (Exception failure) {
+      ExchangeRuntime failedRuntime = runtime;
+      runtime = null;
+      runtimeFactory = null;
+      ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+          () -> {
+            if (failedRuntime != null) {
+              failedRuntime.close();
+            }
+          }, cleanupFailure -> getLogger().log(Level.SEVERE,
+              "Exchange startup cleanup failed", cleanupFailure));
       getLogger().log(Level.SEVERE,
           "Exchange startup failed; addon remains disabled. Fix the configuration and run"
               + " /qse reload or restart the server. Cause:", failure);
