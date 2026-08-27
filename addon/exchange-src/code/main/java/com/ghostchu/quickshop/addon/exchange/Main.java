@@ -235,8 +235,30 @@ public final class Main extends JavaPlugin implements Listener {
   }
 
   private AddonMessageService buildMessages() {
-    return AddonMessageService.load(
-        new File(getDataFolder(), "messages.yml"));
+    File messagesFile = new File(getDataFolder(), "messages.yml");
+    try {
+      return AddonMessageService.load(messagesFile);
+    } catch (IllegalArgumentException unreadable) {
+      if (!messagesFile.isFile()) {
+        throw unreadable;
+      }
+      // A corrupted or structurally incomplete messages.yml must not leave the addon disabled
+      // with no way back: back up the broken file, restore the bundled defaults and retry once.
+      File backup = new File(getDataFolder(), "messages.yml.corrupted");
+      try {
+        java.nio.file.Files.move(messagesFile.toPath(), backup.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      } catch (java.io.IOException backupFailure) {
+        throw new IllegalStateException(
+            "messages.yml is unreadable and could not be backed up: "
+                + unreadable.getMessage(), backupFailure);
+      }
+      getLogger().warning("messages.yml was unreadable; backed up the broken file to "
+          + backup.getName() + " and restored the bundled defaults. Cause: "
+          + unreadable.getMessage());
+      saveResource("messages.yml", true);
+      return AddonMessageService.load(messagesFile);
+    }
   }
 
   private void installPlayerEntrypoints(AddonMessageService messages, RolloutPolicy rollout) {
