@@ -149,6 +149,16 @@ public final class AdminCommandRouter {
       actor.message("admin-command-invalid");
     } catch (IllegalArgumentException invalid) {
       actor.message("admin-command-invalid");
+    } catch (IllegalStateException attachFailure) {
+      if (attachFailure.getMessage() != null
+          && attachFailure.getMessage().startsWith("created-but-not-attached:")) {
+        String marketId = attachFailure.getMessage()
+            .substring("created-but-not-attached:".length())
+            .split(";", 2)[0];
+        actor.message("admin-stock-created-not-attached", marketId);
+        return;
+      }
+      actor.message("admin-command-failed");
     } catch (Exception failure) {
       actor.message("admin-command-failed");
     }

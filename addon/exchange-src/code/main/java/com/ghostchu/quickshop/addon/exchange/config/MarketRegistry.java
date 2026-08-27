@@ -111,6 +111,31 @@ public final class MarketRegistry {
     return new Versions(entry.structuralVersion, entry.riskVersion, entry.feeVersion);
   }
 
+  /**
+   * Hot-adds a brand-new market so it becomes immediately visible to every consumer that holds
+   * this registry. The definition starts at structural/risk/fee version 1 and is persisted by the
+   * configured persistence boundary before it is published.
+   */
+  public synchronized void addMarket(MarketDefinition definition) {
+    Objects.requireNonNull(definition, "definition");
+    if (markets.containsKey(definition.marketId())) {
+      throw new IllegalArgumentException("market already exists: " + definition.marketId());
+    }
+    markets.forEach((marketId, entry) -> {
+      if (entry.definition.security() != null
+          && definition.security() != null
+          && entry.definition.security().symbol().equalsIgnoreCase(definition.security().symbol())) {
+        throw new IllegalArgumentException(
+            "security symbol already exists: " + definition.security().symbol());
+      }
+    });
+    Entry candidate = new Entry(definition);
+    Map<String, MarketConfigurationPersistence.State> persisted = new LinkedHashMap<>();
+    persisted.put(definition.marketId(), candidate.persistedState());
+    persistence.persist(Map.copyOf(persisted));
+    markets.put(definition.marketId(), candidate);
+  }
+
   public synchronized FeeSchedule feeSchedule(String marketId) {
     Entry entry = markets.get(marketId);
     if (entry == null) {

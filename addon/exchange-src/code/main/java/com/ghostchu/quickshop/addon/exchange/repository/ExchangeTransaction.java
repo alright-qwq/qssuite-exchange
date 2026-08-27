@@ -7,6 +7,7 @@ import com.ghostchu.quickshop.addon.exchange.ledger.LedgerJournal;
 import com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport;
 import com.ghostchu.quickshop.addon.exchange.operations.AuditRecord;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
+import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -47,6 +48,8 @@ public interface ExchangeTransaction {
   Optional<SecurityDefinitionState> existingSecurityDefinition(String marketId)
       throws SQLException;
   void insertSecurityDefinition(SecurityDefinitionState definition) throws SQLException;
+  void insertMarket(MarketDefinition definition, boolean enabled) throws SQLException;
+  boolean marketExists(String marketId) throws SQLException;
   void updateSecurityDefinition(SecurityDefinitionState definition, long expectedVersion)
       throws SQLException;
   void appendSecurityAudit(SecurityAuditRecord record) throws SQLException;

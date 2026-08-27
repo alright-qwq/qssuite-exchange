@@ -80,12 +80,13 @@
 
 ### 推荐操作顺序
 
-1. 以 `enabled: false` 配置股票市场。
-2. 启动一次服务器，让市场和证券行被创建。
-3. 把市场设为 `enabled: true` 并重启，或使用市场暂停/恢复管理命令。
-4. 只有在市场状态为 `OPEN` 之后，才恢复证券（`/qse admin stock resume <marketId> ...`）。恢复证券也会打开因 `stock pause` 而被暂停的市场状态；因其他原因（例如对账）停牌的市场会保持停牌。
-5. 用 `/qse admin stock issue` 发行初始供应量。
-6. 确认资产页显示证券余额，市场详情页显示 `Asset: VIRTUAL_SECURITY`、`Symbol: <symbol>`、`Total supply: <total>`。
+1. 直接执行 `/qse admin stock create`。新证券会立即写入 `exchange_markets`、`exchange_market_state`、`exchange_securities`，并自动把市场条目写回 `markets.yml`（`enabled: false`）。
+2. 新市场无需重启即可出现在 `/qse stocks` 列表和 `/qse stock <symbol>` 详情页，但初始为 `CLOSED`，不能下单。
+3. 用 `/qse admin stock issue` 发行初始供应量。
+4. 用 `/qse admin stock resume <marketId|symbol> ...` 打开交易。恢复证券也会打开因 `stock pause` 而被暂停的市场状态；因其他原因（例如对账）停牌的市场会保持停牌。
+5. 确认资产页显示证券余额，市场详情页显示 `Asset: VIRTUAL_SECURITY`、`Symbol: <symbol>`、`Total supply: <total>`。
+
+如果热插失败（例如数据库暂时不可用），`create` 会提示“证券已创建但运行时未挂载”。此时先确认 `markets.yml` 已写入新市场条目（正常会写入）；若已写入，执行 `/qse reload` 即可恢复；若未写入，手动补上该市场条目后再 `/qse reload`，无需重启服务器。
 
 关闭股票前，先撤掉或让所有未成交订单结束，然后：
 `/qse admin stock close <marketId> <recoveryAccount> <reason>`。

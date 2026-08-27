@@ -81,6 +81,52 @@ class SecurityServiceTest {
   }
 
   @Test
+  void createInsertsMarketStateAndSecurityRowsForNewMarket() throws Exception {
+    // Drop the pre-seeded rows so this test exercises the fully new-market creation path.
+    try (Connection connection = connections.open(); Statement statement = connection.createStatement()) {
+      statement.executeUpdate("DELETE FROM " + tables.marketState() + " WHERE market_id='"
+          + marketId + "'");
+      statement.executeUpdate("DELETE FROM " + tables.markets() + " WHERE market_id='"
+          + marketId + "'");
+    }
+    UUID actor = UUID.randomUUID();
+
+    SecurityMutationResult created = service.create(actor, UUID.randomUUID(), marketId,
+        "ALPHA", "Alpha", "Concept stock", "default", new BigDecimal("10.00"), 1000, 1);
+
+    assertThat(created.replayed()).isFalse();
+    assertThat((Boolean) repository.inTransaction(tx -> tx.marketExists(marketId))).isTrue();
+    MarketState state = repository.inTransaction(tx -> tx.marketState(marketId));
+    assertThat(state.status()).isEqualTo(MarketStatus.CLOSED);
+    assertThat(state.referencePrice()).isEqualByComparingTo("10.00");
+    SecurityDefinitionState definition =
+        repository.inTransaction(tx -> tx.securityDefinition(marketId));
+    assertThat(definition.status()).isEqualTo("OPEN");
+    assertThat(definition.totalSupply()).isEqualTo(1000);
+    assertThat(definition.minimumUnit()).isEqualTo(1);
+  }
+
+  @Test
+  void resumeOpensNewlyCreatedClosedMarket() throws Exception {
+    try (Connection connection = connections.open(); Statement statement = connection.createStatement()) {
+      statement.executeUpdate("DELETE FROM " + tables.marketState() + " WHERE market_id='"
+          + marketId + "'");
+      statement.executeUpdate("DELETE FROM " + tables.markets() + " WHERE market_id='"
+          + marketId + "'");
+    }
+    UUID actor = UUID.randomUUID();
+    service.create(actor, UUID.randomUUID(), marketId, "ALPHA", "Alpha",
+        "Concept stock", "default", new BigDecimal("10.00"), 1000, 1);
+
+    service.resume(actor, UUID.randomUUID(), marketId, "open the new market");
+
+    MarketState state = repository.inTransaction(tx -> tx.marketState(marketId));
+    assertThat(state.status()).isEqualTo(MarketStatus.OPEN);
+    String security = repository.inTransaction(tx -> tx.securityDefinition(marketId).status());
+    assertThat(security).isEqualTo("OPEN");
+  }
+
+  @Test
   void createRejectsInvalidSymbolFormat() throws Exception {
     UUID actor = UUID.randomUUID();
 
@@ -215,9 +261,10 @@ class SecurityServiceTest {
     MarketStatus resumedState =
         repository.inTransaction(tx -> tx.marketState(marketId).status());
     assertThat(resumedState).isEqualTo(MarketStatus.OPEN);
-    assertThatThrownBy(() -> service.resume(
-        actor, UUID.randomUUID(), marketId, "resume again"))
-        .isInstanceOf(IllegalStateException.class);
+    service.resume(actor, UUID.randomUUID(), marketId, "resume again is idempotent");
+    assertThat((MarketStatus) repository.inTransaction(
+        tx -> tx.marketState(marketId).status()))
+        .isEqualTo(MarketStatus.OPEN);
   }
 
   @Test

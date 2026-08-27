@@ -29,12 +29,14 @@ import com.ghostchu.quickshop.addon.exchange.service.PersistentOrderService;
 import com.ghostchu.quickshop.addon.exchange.service.ExchangeActionService;
 import com.ghostchu.quickshop.addon.exchange.service.SecurityAssetCustody;
 import com.ghostchu.quickshop.addon.exchange.security.SecurityService;
+import com.ghostchu.quickshop.addon.exchange.repository.SecurityDefinitionState;
 import com.ghostchu.quickshop.addon.exchange.service.RecoveryHandler;
 import com.ghostchu.quickshop.addon.exchange.transfer.ItemTransferService;
 import com.ghostchu.quickshop.addon.exchange.transfer.MoneyTransferService;
 import com.ghostchu.quickshop.addon.exchange.transfer.PlayerOperationSerialiser;
 import com.ghostchu.quickshop.addon.exchange.transfer.TransferRecoveryService;
 import com.ghostchu.quickshop.addon.exchange.ui.ExchangeViewService;
+import com.ghostchu.quickshop.addon.exchange.ui.ExchangeViewService.MarketView;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +48,7 @@ import java.sql.Types;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -55,6 +58,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -64,9 +69,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class ExchangeRuntimeFactory {
   private final JavaPlugin addon;
   private final QuickShop quickShop;
+  private volatile Database database;
   private volatile Map<String, PersistentOrderService> markets;
   private volatile MarketDataService marketData;
   private volatile MarketRegistry registry;
+  private volatile JdbcExchangeRepository repository;
+  private volatile ExchangeActionService actions;
+  private volatile ExchangeViewService views;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
     this.addon = java.util.Objects.requireNonNull(addon, "addon");
@@ -75,6 +84,7 @@ public final class ExchangeRuntimeFactory {
 
   public ExchangeRuntime create() throws Exception {
     Database database = database();
+    this.database = database;
     database.writer().acquire();
     try {
       TableNames tables = new TableNames(quickShop.getDbPrefix());
@@ -95,8 +105,9 @@ public final class ExchangeRuntimeFactory {
         throw new IllegalStateException("exchange writer lock was lost during database bootstrap");
       }
       JdbcExchangeRepository repository = bootstrapped.get();
+      this.repository = repository;
       MarketRegistry registry = MarketRegistry.load(configFile, marketsFile, repository);
-    this.registry = registry;
+      this.registry = registry;
 
     MarketDataService marketData = new MarketDataService(new CandleAggregator(), repository);
     this.marketData = marketData;
@@ -142,6 +153,7 @@ public final class ExchangeRuntimeFactory {
     ExchangeActionService actions = new ExchangeActionService(
         markets, moneyTransfers, itemTransfers,
         marketId -> registry.require(marketId).assetType() == AssetType.VIRTUAL_SECURITY);
+    this.actions = actions;
     DrainingExecutor recoveryExecutor = new DrainingExecutor(
         "qs-exchange-recovery-", Duration.ofSeconds(30));
     DrainingExecutor recoveryFenceExecutor = new DrainingExecutor(
@@ -203,12 +215,14 @@ public final class ExchangeRuntimeFactory {
     ExchangeViewService views = new ExchangeViewService(marketViews, marketData, maintenance,
         repository, java.util.List.copyOf(transferTargets.values()),
         java.time.Duration.ofMillis(guiRefreshMs));
+    this.views = views;
     java.nio.file.Path auditDirectory = requireAuditDirectory(
         addon.getDataFolder().toPath(),
         addon.getConfig().getString("operations.audit-export-directory", "audit"));
     AdminExchangeService administration = new AdminExchangeService(
         markets, repository, new com.ghostchu.quickshop.addon.exchange.operations.AuditExporter(),
-        auditDirectory, new SecurityService(repository), inventory, metrics);
+        auditDirectory, new SecurityService(repository), inventory, metrics,
+        this::addSecurityMarket);
     Runnable resumeHalted = () -> resumeExpiredHalts(repository, registry.marketIds(), database.writer());
     com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector detector =
         new com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector(Clock.systemUTC());
@@ -304,6 +318,166 @@ public final class ExchangeRuntimeFactory {
       service.updateRiskLimits(limits(next), accountLimits(next.risk()));
     }
     this.registry = liveRegistry;
+  }
+
+  /**
+   * Hot-adds a newly created virtual security market so it can be traded without a restart.
+   * The persisted rows are created by {@link SecurityService}; this method only attaches the
+   * live order book, registry entry, view and action wiring.
+   */
+  public void addSecurityMarket(String marketId, boolean replayed) {
+    MarketRegistry liveRegistry = this.registry;
+    ExchangeViewService liveViews = this.views;
+    ExchangeActionService liveActions = this.actions;
+    JdbcExchangeRepository store = this.repository;
+    Database database = this.database;
+    Map<String, PersistentOrderService> liveMarkets = this.markets;
+    if (liveRegistry == null || liveViews == null || liveActions == null || store == null
+        || database == null || liveMarkets == null) {
+      throw new IllegalStateException("exchange runtime is not started");
+    }
+    if (liveMarkets.containsKey(marketId)) {
+      if (replayed) {
+        return;
+      }
+      throw new IllegalArgumentException("market already exists in runtime: " + marketId);
+    }
+    boolean marketRowExists;
+    try {
+      marketRowExists = store.marketExists(marketId);
+    } catch (SQLException failure) {
+      throw new IllegalStateException("failed to verify created market row", failure);
+    }
+    if (!marketRowExists) {
+      throw new IllegalStateException(
+          "created market is missing its persisted market row: " + marketId);
+    }
+    MarketDefinition definition;
+    try {
+      definition = store.inTransaction(tx -> {
+        SecurityDefinitionState security =
+            tx.securityDefinition(marketId);
+        return SecurityService.buildMarketDefinition(
+            marketId, security.symbol(), security.name(), security.description(),
+            security.currencyId(), security.basePrice(), security.totalSupply(),
+            security.minimumUnit());
+      });
+    } catch (SQLException failure) {
+      throw new IllegalStateException("failed to load created security definition", failure);
+    }
+    MarketDataService marketData = this.marketData;
+    MarketRules rules = rules(definition);
+    RiskLimits limits = limits(definition);
+    AssetCustody custody = new SecurityAssetCustody(definition.security().minimumUnit());
+    PersistentOrderService service = new PersistentOrderService(
+        store, rules, limits, RecoveryHandler.NO_OP,
+        accountLimits(definition.risk()), marketData, custody);
+    try {
+      service.recoverFromDatabase();
+    } catch (SQLException failure) {
+      throw new IllegalStateException(
+          "failed to recover the newly created order book: " + marketId, failure);
+    }
+    MarketView view = buildMarketView(definition, service, store);
+    if (!replayed) {
+      persistMarketToMarketsFile(definition);
+    }
+    synchronized (this) {
+      if (this.markets.containsKey(marketId)) {
+        if (replayed) {
+          return;
+        }
+        throw new IllegalArgumentException("market already exists in runtime: " + marketId);
+      }
+      this.registry = liveRegistry;
+      liveRegistry.addMarket(definition);
+      this.markets = extendMarkets(this.markets, marketId, service);
+      this.actions = liveActions.withMarket(marketId, service);
+      this.views = liveViews;
+      liveViews.addMarket(view);
+    }
+  }
+
+  private void persistMarketToMarketsFile(MarketDefinition definition) {
+    File marketsFile = new File(addon.getDataFolder(), "markets.yml");
+    try {
+      YamlConfiguration markets = YamlConfiguration.loadConfiguration(marketsFile);
+      ConfigurationSection section = markets.getConfigurationSection("markets");
+      if (section == null) {
+        section = markets.createSection("markets");
+      }
+      if (section.contains(definition.marketId())) {
+        return;
+      }
+      ConfigurationSection market = section.createSection(definition.marketId());
+      market.set("enabled", false);
+      market.set("display-name", definition.displayName());
+      if (definition.assetType() == AssetType.VIRTUAL_SECURITY) {
+        ConfigurationSection security = market.createSection("security");
+        security.set("symbol", definition.security().symbol());
+        security.set("name", definition.security().name());
+        security.set("description", definition.security().description());
+        security.set("base-price", definition.security().basePrice().toPlainString());
+        security.set("total-supply", definition.security().totalSupply());
+        security.set("minimum-unit", definition.security().minimumUnit());
+      }
+      market.set("currency", definition.structural().currencyId());
+      market.set("base-price", definition.structural().basePrice().toPlainString());
+      market.set("min-price", definition.structural().minPrice().toPlainString());
+      market.set("max-price", definition.structural().maxPrice().toPlainString());
+      market.set("tick-size", definition.structural().tickSize().toPlainString());
+      market.set("price-scale", definition.structural().priceScale());
+      market.set("currency-scale", definition.structural().currencyScale());
+      market.set("min-quantity", definition.structural().minQuantity());
+      market.set("max-quantity", definition.structural().maxQuantity());
+      market.set("discovery-quantity", definition.structural().discoveryQuantity());
+      market.set("maker-fee-rate", definition.risk().makerFeeRate().toPlainString());
+      market.set("taker-fee-rate", definition.risk().takerFeeRate().toPlainString());
+      market.set("max-account-holding", definition.risk().maxAccountHolding());
+      market.set("max-frozen-currency", definition.risk().maxFrozenCurrency().toPlainString());
+      market.set("max-open-orders", definition.risk().maxOpenOrders());
+      market.set("block-container-shops", definition.blockContainerShops());
+      markets.set("markets", section);
+      markets.save(marketsFile);
+    } catch (Exception failure) {
+      throw new IllegalStateException(
+          "created market could not be persisted to markets.yml: " + definition.marketId(),
+          failure);
+    }
+  }
+
+  private static Map<String, PersistentOrderService> extendMarkets(
+      Map<String, PersistentOrderService> current, String marketId,
+      PersistentOrderService service) {
+    Map<String, PersistentOrderService> extended = new java.util.LinkedHashMap<>(current);
+    extended.put(marketId, service);
+    return Map.copyOf(extended);
+  }
+
+  private MarketView buildMarketView(
+      MarketDefinition definition, PersistentOrderService service,
+      JdbcExchangeRepository store) {
+    String symbol = definition.security() == null ? null : definition.security().symbol();
+    Long totalSupply = definition.security() == null ? null : definition.security().totalSupply();
+    return new MarketView(definition.marketId(), definition.displayName(), service,
+        definition.assetType().name(), symbol, totalSupply,
+        () -> {
+          try {
+            return store.inTransaction(tx -> tx.securityDefinition(definition.marketId()).status());
+          } catch (SQLException failure) {
+            throw new IllegalStateException(
+                "failed to load security status: " + definition.marketId(), failure);
+          }
+        },
+        () -> {
+          try {
+            return store.inTransaction(
+                tx -> tx.securityDefinition(definition.marketId()).issuedSupply());
+          } catch (SQLException failure) {
+            throw new IllegalStateException(
+                "failed to load issued supply: " + definition.marketId(), failure);
+          }
+        });
   }
 
   static boolean requireReloadableStructure(
@@ -446,7 +620,7 @@ public final class ExchangeRuntimeFactory {
           if (marketExists(connection, tables, marketId)) {
             continue;
           }
-          insertMarket(connection, tables, definition);
+          insertMarket(connection, tables, definition, definition.enabled());
         }
         connection.commit();
       } catch (SQLException | RuntimeException failure) {
@@ -507,74 +681,15 @@ public final class ExchangeRuntimeFactory {
     }
   }
 
-  private static void insertMarket(Connection connection, TableNames tables, MarketDefinition definition)
+  static void insertMarket(Connection connection, TableNames tables, MarketDefinition definition,
+                           boolean enabled) throws SQLException {
+    JdbcExchangeRepository.insertMarket(connection, tables, definition, enabled);
+  }
+
+  /** Backwards-compatible helper used by tests that pre-seed disabled markets. */
+  static void insertMarket(Connection connection, TableNames tables, MarketDefinition definition)
       throws SQLException {
-    MarketRules rules = rules(definition);
-    boolean virtual = definition.assetType() == AssetType.VIRTUAL_SECURITY;
-    try (PreparedStatement market = connection.prepareStatement(
-        "INSERT INTO " + tables.markets()
-            + " (market_id,currency_id,item_fingerprint,item_template,asset_type,structural_payload,"
-            + "fee_schedule_payload,risk_payload,structural_version,risk_version,created_at)"
-            + " VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-         PreparedStatement state = connection.prepareStatement(
-             "INSERT INTO " + tables.marketState()
-                 + " (market_id,status,priority_sequence,match_sequence,reference_price,"
-                 + "last_price,halted_until,discovery_quantity,circuit_breaker_level,version)"
-                 + " VALUES (?,?,?,?,?,?,?,?,?,?)");
-         PreparedStatement security = virtual ? connection.prepareStatement(
-             "INSERT INTO " + tables.securities()
-                 + " (market_id,symbol,name,description,currency_id,base_price,total_supply,"
-                 + "issued_supply,minimum_unit,status,recovery_account,created_at,updated_at,version)"
-                 + " VALUES (?,?,?,?,?,?,?,0,?,?,NULL,?,?,0)")
-             : null) {
-      market.setString(1, definition.marketId());
-      market.setString(2, definition.structural().currencyId());
-      if (virtual) {
-        market.setString(3, "");
-        market.setString(4, "");
-      } else {
-        market.setString(3, definition.item().fingerprint() == null
-            ? definition.item().material() : definition.item().fingerprint());
-        market.setString(4, Optional.ofNullable(definition.item().encodedTemplate()).orElse(""));
-      }
-      market.setString(5, definition.assetType().name());
-      market.setString(6, "{}");
-      market.setString(7, "{\"makerFeeRate\":\"" + rules.makerFeeRate().toPlainString()
-          + "\",\"takerFeeRate\":\"" + rules.takerFeeRate().toPlainString()
-          + "\",\"currencyScale\":" + definition.structural().currencyScale() + "}");
-      market.setString(8, "{}");
-      market.setLong(9, 1L);
-      market.setLong(10, 1L);
-      market.setLong(11, Instant.now().toEpochMilli());
-      market.executeUpdate();
-
-      state.setString(1, definition.marketId());
-      state.setString(2, definition.enabled() ? MarketStatus.OPEN.name() : MarketStatus.CLOSED.name());
-      state.setLong(3, 0L);
-      state.setLong(4, 0L);
-      state.setString(5, rules.basePrice().toPlainString());
-      state.setNull(6, Types.DECIMAL);
-      state.setNull(7, Types.BIGINT);
-      state.setLong(8, 0L);
-      state.setInt(9, 0);
-      state.setLong(10, 0L);
-      state.executeUpdate();
-
-      if (virtual) {
-        security.setString(1, definition.marketId());
-        security.setString(2, definition.security().symbol());
-        security.setString(3, definition.security().name());
-        security.setString(4, definition.security().description());
-        security.setString(5, definition.security().currencyId());
-        security.setString(6, rules.basePrice().toPlainString());
-        security.setLong(7, definition.security().totalSupply());
-        security.setLong(8, definition.security().minimumUnit());
-        security.setString(9, definition.enabled() ? "OPEN" : "CLOSED");
-        security.setLong(10, Instant.now().toEpochMilli());
-        security.setLong(11, Instant.now().toEpochMilli());
-        security.executeUpdate();
-      }
-    }
+    insertMarket(connection, tables, definition, definition.enabled());
   }
 
   private static void recoverMarkets(Map<String, PersistentOrderService> markets)

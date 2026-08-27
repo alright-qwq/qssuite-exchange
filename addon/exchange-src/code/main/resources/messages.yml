@@ -11,6 +11,7 @@ en-US:
   inventory-full: Your inventory is full; the withdrawal remains ready to claim.
   admin-command-invalid: The administrator command or its arguments are invalid.
   admin-command-failed: The administrator request could not be completed.
+  admin-stock-created-not-attached: 'The security was created, but the live market could not be attached. Run /qse reload to restore the runtime: <0>'
   admin-reconciliation-balanced: Exchange reconciliation completed with no differences.
   admin-reconciliation-difference: Exchange reconciliation found differences; review the server audit logs.
   admin-audit-exported: 'Exchange audit CSV exported: <0>'
@@ -238,6 +239,7 @@ zh-CN:
   inventory-full: '背包空间不足，提现将保留为待领取。'
   admin-command-invalid: '管理员命令或参数无效。'
   admin-command-failed: '管理员请求未能完成。'
+  admin-stock-created-not-attached: '证券已创建，但运行时热插失败。请执行 /qse reload 恢复：<0>'
   command-failed: '交易所命令未能完成，请重试或查看服务器控制台。'
   admin-reconciliation-balanced: '交易所对账完成，未发现差异。'
   admin-reconciliation-difference: '交易所对账发现差异，请检查服务器审计日志。'

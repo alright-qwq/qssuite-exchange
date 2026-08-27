@@ -9,6 +9,8 @@ import com.ghostchu.quickshop.addon.exchange.core.model.OrderStatus;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderType;
 import com.ghostchu.quickshop.addon.exchange.core.model.TimeInForce;
 import com.ghostchu.quickshop.addon.exchange.core.model.Trade;
+import com.ghostchu.quickshop.addon.exchange.config.AssetType;
+import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
 import com.ghostchu.quickshop.addon.exchange.ledger.LedgerEntry;
 import com.ghostchu.quickshop.addon.exchange.ledger.LedgerJournal;
 import com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport;
@@ -72,6 +74,78 @@ public final class JdbcExchangeRepository
   private final SqlDialect dialect;
   private final TableNames tables;
 
+  public static void insertMarket(
+      Connection connection, TableNames tables, MarketDefinition definition, boolean enabled)
+      throws SQLException {
+    com.ghostchu.quickshop.addon.exchange.core.model.MarketRules rules =
+        new com.ghostchu.quickshop.addon.exchange.core.model.MarketRules(
+            definition.marketId(), definition.structural().currencyId(),
+            definition.structural().basePrice(), definition.structural().minPrice(),
+            definition.structural().maxPrice(), definition.structural().tickSize(),
+            definition.structural().minQuantity(), definition.structural().maxQuantity(),
+            definition.structural().priceScale(), definition.risk().makerFeeRate(),
+            definition.risk().takerFeeRate());
+    boolean virtual = definition.assetType() == AssetType.VIRTUAL_SECURITY;
+    try (PreparedStatement market = connection.prepareStatement(
+        "INSERT INTO " + tables.markets()
+            + " (market_id,currency_id,item_fingerprint,item_template,asset_type,"
+            + "structural_payload,fee_schedule_payload,risk_payload,structural_version,"
+            + "risk_version,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+         PreparedStatement state = connection.prepareStatement(
+             "INSERT INTO " + tables.marketState()
+                 + " (market_id,status,priority_sequence,match_sequence,reference_price,"
+                 + "last_price,halted_until,discovery_quantity,circuit_breaker_level,version)"
+                 + " VALUES (?,?,?,?,?,?,?,?,?,?)");
+         PreparedStatement security = virtual ? connection.prepareStatement(
+             "INSERT INTO " + tables.securities()
+                 + " (market_id,symbol,name,description,currency_id,base_price,total_supply,"
+                 + "issued_supply,minimum_unit,status,recovery_account,created_at,updated_at,"
+                 + "version) VALUES (?,?,?,?,?,?,?,0,?,?,NULL,?,?,0)")
+             : null) {
+      market.setString(1, definition.marketId());
+      market.setString(2, definition.structural().currencyId());
+      market.setString(3, "");
+      market.setString(4, "");
+      market.setString(5, definition.assetType().name());
+      market.setString(6, "{}");
+      market.setString(7, "{\"makerFeeRate\":\"" + rules.makerFeeRate().toPlainString()
+          + "\",\"takerFeeRate\":\"" + rules.takerFeeRate().toPlainString()
+          + "\",\"currencyScale\":" + definition.structural().currencyScale() + "}");
+      market.setString(8, "{}");
+      market.setLong(9, 1L);
+      market.setLong(10, 1L);
+      market.setLong(11, Instant.now().toEpochMilli());
+      market.executeUpdate();
+
+      state.setString(1, definition.marketId());
+      state.setString(2, enabled ? MarketStatus.OPEN.name() : MarketStatus.CLOSED.name());
+      state.setLong(3, 0L);
+      state.setLong(4, 0L);
+      state.setString(5, rules.basePrice().toPlainString());
+      state.setNull(6, Types.DECIMAL);
+      state.setNull(7, Types.BIGINT);
+      state.setLong(8, 0L);
+      state.setInt(9, 0);
+      state.setLong(10, 0L);
+      state.executeUpdate();
+
+      if (virtual) {
+        security.setString(1, definition.marketId());
+        security.setString(2, definition.security().symbol());
+        security.setString(3, definition.security().name());
+        security.setString(4, definition.security().description());
+        security.setString(5, definition.security().currencyId());
+        security.setString(6, rules.basePrice().toPlainString());
+        security.setLong(7, definition.security().totalSupply());
+        security.setLong(8, definition.security().minimumUnit());
+        security.setString(9, enabled ? "OPEN" : "CLOSED");
+        security.setLong(10, Instant.now().toEpochMilli());
+        security.setLong(11, Instant.now().toEpochMilli());
+        security.executeUpdate();
+      }
+    }
+  }
+
   public JdbcExchangeRepository(
       ConnectionProvider connections, SqlDialect dialect, TableNames tables) {
     this.connections = Objects.requireNonNull(connections, "connections");
@@ -96,6 +170,20 @@ public final class JdbcExchangeRepository
     inTransaction(transaction -> {
       ((JdbcTransaction) transaction).archiveFeeVersion(marketId, feeVersion);
       return null;
+    });
+  }
+
+  /** Returns whether a market row already exists for the given id. */
+  public boolean marketExists(String marketId) throws SQLException {
+    Objects.requireNonNull(marketId, "marketId");
+    return inTransaction(tx -> {
+      try (PreparedStatement query = ((JdbcTransaction) tx).connection().prepareStatement(
+          "SELECT market_id FROM " + tables.markets() + " WHERE market_id=?")) {
+        query.setString(1, marketId);
+        try (ResultSet result = query.executeQuery()) {
+          return result.next();
+        }
+      }
     });
   }
 
@@ -800,6 +888,10 @@ public final class JdbcExchangeRepository
       this.tables = tables;
     }
 
+    private Connection connection() {
+      return connection;
+    }
+
     @Override
     public TransferRecord createTransfer(TransferRecord prepared) throws SQLException {
       try (PreparedStatement insert = connection.prepareStatement(
@@ -1321,6 +1413,27 @@ public final class JdbcExchangeRepository
               + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0)")) {
         writeSecurityDefinition(insert, definition);
         insert.executeUpdate();
+      }
+    }
+
+    @Override
+    public void insertMarket(MarketDefinition definition, boolean enabled) throws SQLException {
+      Objects.requireNonNull(definition, "definition");
+      if (definition.assetType() != AssetType.VIRTUAL_SECURITY) {
+        throw new IllegalArgumentException(
+            "runtime market creation only supports virtual securities: " + definition.marketId());
+      }
+      JdbcExchangeRepository.insertMarket(connection, tables, definition, enabled);
+    }
+
+    @Override
+    public boolean marketExists(String marketId) throws SQLException {
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT market_id FROM " + tables.markets() + " WHERE market_id=?")) {
+        query.setString(1, marketId);
+        try (ResultSet result = query.executeQuery()) {
+          return result.next();
+        }
       }
     }
 

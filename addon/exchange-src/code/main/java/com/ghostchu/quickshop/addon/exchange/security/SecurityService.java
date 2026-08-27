@@ -8,6 +8,8 @@ import com.ghostchu.quickshop.addon.exchange.repository.SecurityAuditRecord;
 import com.ghostchu.quickshop.addon.exchange.repository.SecurityBalance;
 import com.ghostchu.quickshop.addon.exchange.repository.SecurityDefinitionState;
 import com.ghostchu.quickshop.addon.exchange.repository.SecurityLedgerEntry;
+import com.ghostchu.quickshop.addon.exchange.config.AssetType;
+import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -55,6 +57,14 @@ public final class SecurityService {
     if (totalSupply % minimumUnit != 0) {
       throw new IllegalArgumentException("total supply must be a multiple of minimum unit");
     }
+    if (minimumUnit > totalSupply) {
+      throw new IllegalArgumentException("minimum unit must not exceed total supply");
+    }
+    if (totalSupply < 10) {
+      throw new IllegalArgumentException("total supply must be at least 10");
+    }
+    MarketDefinition definition = buildMarketDefinition(
+        marketId, symbol, name, description, currencyId, basePrice, totalSupply, minimumUnit);
     Instant now = Instant.now();
     String payload = createPayload(marketId, symbol, name, currencyId, basePrice,
         totalSupply, minimumUnit);
@@ -63,13 +73,24 @@ public final class SecurityService {
       if (duplicate != null) {
         return replayed(tx, marketId, CREATE_ACTION, duplicate);
       }
-      if (tx.existingSecurityDefinition(marketId).isPresent()) {
+      SecurityDefinitionState existing = tx.existingSecurityDefinition(marketId).orElse(null);
+      if (existing != null) {
         throw new IllegalArgumentException("security already exists for market: " + marketId);
       }
-      SecurityDefinitionState definition = new SecurityDefinitionState(
+      if (!tx.marketExists(marketId)) {
+        // The persisted market row also materialises a CLOSED security row; it is promoted to
+        // OPEN below instead of being inserted twice.
+        tx.insertMarket(definition, false);
+      }
+      SecurityDefinitionState definitionState = new SecurityDefinitionState(
           marketId, symbol, name, description, currencyId, basePrice, totalSupply, 0,
           minimumUnit, SecurityStatus.OPEN.name(), null, now, now, 0);
-      tx.insertSecurityDefinition(definition);
+      SecurityDefinitionState persisted = tx.existingSecurityDefinition(marketId).orElse(null);
+      if (persisted != null) {
+        tx.updateSecurityDefinition(definitionState, persisted.version());
+      } else {
+        tx.insertSecurityDefinition(definitionState);
+      }
       appendAudit(tx, actorId, requestId, marketId, CREATE_ACTION, payload, "SUCCESS", now);
       return new SecurityMutationResult(
           marketId, symbol, CREATE_ACTION, SecurityStatus.OPEN.name(), payload, false);
@@ -166,7 +187,7 @@ public final class SecurityService {
   public SecurityMutationResult resume(
       UUID actorId, UUID requestId, String marketId, String reason) throws SQLException {
     return changeStatus(actorId, requestId, marketId, reason,
-        RESUME_ACTION, SecurityStatus.OPEN, SecurityStatus.PAUSED);
+        RESUME_ACTION, SecurityStatus.OPEN, SecurityStatus.PAUSED, SecurityStatus.OPEN);
   }
 
   public SecurityMutationResult close(
@@ -233,7 +254,8 @@ public final class SecurityService {
             state.prioritySequence(), state.matchSequence(), state.referencePrice(),
             state.lastPrice(), state.haltedUntil(), state.discoveryQuantity(),
             state.circuitBreakerLevel(), state.version() + 1), state.version());
-      } else if (target == SecurityStatus.OPEN && state.status() == MarketStatus.PAUSED) {
+      } else if (target == SecurityStatus.OPEN
+          && (state.status() == MarketStatus.PAUSED || state.status() == MarketStatus.CLOSED)) {
         tx.updateMarketState(new MarketState(marketId, MarketStatus.OPEN,
             state.prioritySequence(), state.matchSequence(), state.referencePrice(),
             state.lastPrice(), state.haltedUntil(), state.discoveryQuantity(),
@@ -407,5 +429,30 @@ public final class SecurityService {
     if (value <= 0) {
       throw new IllegalArgumentException(name + " must be positive");
     }
+  }
+
+  /**
+   * Builds the runtime market definition for a newly created virtual security. The market is
+   * created in the CLOSED state; the admin later issues supply and resumes trading.
+   */
+  public static MarketDefinition buildMarketDefinition(
+      String marketId, String symbol, String name, String description, String currencyId,
+      BigDecimal basePrice, long totalSupply, long minimumUnit) {
+    BigDecimal one = BigDecimal.ONE;
+    long discovery = Math.min(totalSupply, Math.max(totalSupply / 100, minimumUnit * 10));
+    MarketDefinition.StructuralRules structural = new MarketDefinition.StructuralRules(
+        currencyId, basePrice, one, basePrice.multiply(new BigDecimal("1000")),
+        one.movePointLeft(2), 2, 2, minimumUnit, totalSupply, discovery);
+    MarketDefinition.RiskRules risk = new MarketDefinition.RiskRules(
+        new BigDecimal("0.001"), new BigDecimal("0.002"),
+        new BigDecimal("0.20"), new BigDecimal("0.05"),
+        new BigDecimal("0.20"), new BigDecimal("0.10"), 120,
+        new BigDecimal("0.20"), 600, 100_000,
+        new BigDecimal("10000000.00"), 100, 5, 60);
+    com.ghostchu.quickshop.addon.exchange.config.SecurityDefinition security =
+        new com.ghostchu.quickshop.addon.exchange.config.SecurityDefinition(
+        symbol, name, description, currencyId, basePrice, totalSupply, minimumUnit);
+    return new MarketDefinition(marketId, name, false, null, structural, risk, false,
+        AssetType.VIRTUAL_SECURITY, security);
   }
 }

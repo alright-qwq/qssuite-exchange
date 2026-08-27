@@ -8,14 +8,16 @@ import java.sql.SQLException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 /** Backend action facade used by command and GUI adapters. */
 public final class ExchangeActionService {
-  private final Map<String, PersistentOrderService> markets;
+  private final Map<String, PersistentOrderService> markets = new ConcurrentHashMap<>();
   private final TransferActions transfers;
-  private final Predicate<String> virtualSecurityMarket;
+  private final AtomicReference<Predicate<String>> virtualSecurityMarket;
 
   public ExchangeActionService(Map<String, PersistentOrderService> markets,
                                MoneyTransferService money, ItemTransferService items) {
@@ -58,10 +60,10 @@ public final class ExchangeActionService {
 
   ExchangeActionService(Map<String, PersistentOrderService> markets, TransferActions transfers,
                         Predicate<String> virtualSecurityMarket) {
-    this.markets = Map.copyOf(Objects.requireNonNull(markets, "markets"));
+    this.markets.putAll(Objects.requireNonNull(markets, "markets"));
     this.transfers = Objects.requireNonNull(transfers, "transfers");
-    this.virtualSecurityMarket =
-        Objects.requireNonNull(virtualSecurityMarket, "virtualSecurityMarket");
+    this.virtualSecurityMarket = new AtomicReference<>(
+        Objects.requireNonNull(virtualSecurityMarket, "virtualSecurityMarket"));
   }
 
   public OrderReceipt submitOrder(ExchangeMenuRequest.OrderDraft draft) throws SQLException {
@@ -111,7 +113,7 @@ public final class ExchangeActionService {
 
   private void requirePhysicalMarket(String marketId) {
     market(marketId);
-    if (virtualSecurityMarket.test(marketId)) {
+    if (virtualSecurityMarket.get().test(marketId)) {
       throw new IllegalArgumentException(
           "virtual security markets do not support item transfers: " + marketId);
     }
@@ -126,6 +128,19 @@ public final class ExchangeActionService {
       throw new IllegalArgumentException("unknown market: " + marketId);
     }
     return service;
+  }
+
+  /** Registers the given market on this live action service so it is immediately routable. */
+  public ExchangeActionService withMarket(String targetMarketId, PersistentOrderService service) {
+    Objects.requireNonNull(targetMarketId, "marketId");
+    Objects.requireNonNull(service, "service");
+    PersistentOrderService previous = markets.putIfAbsent(targetMarketId, service);
+    if (previous != null) {
+      throw new IllegalArgumentException("market already exists: " + targetMarketId);
+    }
+    virtualSecurityMarket.updateAndGet(
+        predicate -> predicate.or(candidate -> candidate.equals(targetMarketId)));
+    return this;
   }
 
   interface TransferActions {

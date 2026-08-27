@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class ExchangeActionServiceTest {
   @Test
@@ -46,6 +47,24 @@ class ExchangeActionServiceTest {
     assertThatThrownBy(() -> actions.submitTransfer(draft))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("virtual security markets do not support item transfers");
+  }
+
+  @Test
+  void withMarketRoutesNewMarketToItsOrderServiceAndTreatsItAsVirtual() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    PersistentOrderService original = fixture.service();
+    ExchangeActionService actions = new ExchangeActionService(
+        Map.of(fixture.rules().marketId(), original), transfers(), marketId -> false);
+
+    ExchangeActionService extended = actions.withMarket("concept_beta", original);
+
+    assertThat(extended.market("concept_beta")).isSameAs(original);
+    assertThatThrownBy(() -> extended.submitTransfer(new ExchangeMenuRequest.TransferDraft(
+        UUID.randomUUID(), UUID.randomUUID(), ExchangeMenuRequest.TransferKind.ITEM_DEPOSIT,
+        "concept_beta", null, 1, "concept_beta")))
+        .hasMessageContaining("virtual security markets do not support item transfers");
+    assertThatThrownBy(() -> actions.withMarket(fixture.rules().marketId(), original))
+        .hasMessageContaining("already exists");
   }
 
   private static ExchangeActionService.TransferActions transfers() {

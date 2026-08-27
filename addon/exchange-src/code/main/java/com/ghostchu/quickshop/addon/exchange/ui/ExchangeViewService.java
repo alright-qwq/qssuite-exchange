@@ -29,7 +29,7 @@ import java.util.function.Supplier;
 
 /** Background-only read facade used by exchange UI pages. */
 public final class ExchangeViewService {
-  private final Map<String, MarketView> markets;
+  private volatile Map<String, MarketView> markets;
   private final MarketDataService marketData;
   private final Executor executor;
   private final ExchangeRepository repository;
@@ -71,7 +71,19 @@ public final class ExchangeViewService {
     }
   }
 
-  public List<TransferTarget> transferTargets() {
+  /** Hot-adds a market view so it is immediately visible to list/detail/resolution consumers. */
+  public synchronized void addMarket(MarketView view) {
+    Objects.requireNonNull(view, "view");
+    if (markets.containsKey(view.marketId())) {
+      throw new IllegalArgumentException("market view already exists: " + view.marketId());
+    }
+    Map<String, MarketView> extended = new LinkedHashMap<>(markets);
+    extended.put(view.marketId(), view);
+    this.markets = Map.copyOf(extended);
+  }
+
+  /** Returns a snapshot of the current transfer targets, including hot-added markets. */
+  public synchronized List<TransferTarget> transferTargets() {
     return transferTargets;
   }
 

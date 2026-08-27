@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 /** Coordinates audited administration through the market services that own live order books. */
 public final class AdminExchangeService {
@@ -41,39 +42,48 @@ public final class AdminExchangeService {
   private final SecurityService securities;
   private final InventoryGateway inventory;
   private final ExchangeMetrics metrics;
+  private final BiConsumer<String, Boolean> securityCreated;
 
   public AdminExchangeService(Map<String, PersistentOrderService> markets) {
-    this(markets, null, null, null, null, null, null);
+    this(markets, null, null, null, null, null, null, null);
   }
 
   public AdminExchangeService(
       Map<String, PersistentOrderService> markets, ExchangeRepository repository) {
-    this(markets, repository, null, null, null, null, null);
+    this(markets, repository, null, null, null, null, null, null);
   }
 
   public AdminExchangeService(
       Map<String, PersistentOrderService> markets, ExchangeRepository repository,
       AuditExporter auditExporter, Path auditDirectory) {
-    this(markets, repository, auditExporter, auditDirectory, null, null, null);
+    this(markets, repository, auditExporter, auditDirectory, null, null, null, null);
   }
 
   public AdminExchangeService(
       Map<String, PersistentOrderService> markets, ExchangeRepository repository,
       AuditExporter auditExporter, Path auditDirectory, SecurityService securities) {
-    this(markets, repository, auditExporter, auditDirectory, securities, null, null);
+    this(markets, repository, auditExporter, auditDirectory, securities, null, null, null);
   }
 
   public AdminExchangeService(
       Map<String, PersistentOrderService> markets, ExchangeRepository repository,
       AuditExporter auditExporter, Path auditDirectory, SecurityService securities,
       InventoryGateway inventory) {
-    this(markets, repository, auditExporter, auditDirectory, securities, inventory, null);
+    this(markets, repository, auditExporter, auditDirectory, securities, inventory, null, null);
   }
 
   public AdminExchangeService(
       Map<String, PersistentOrderService> markets, ExchangeRepository repository,
       AuditExporter auditExporter, Path auditDirectory, SecurityService securities,
       InventoryGateway inventory, ExchangeMetrics metrics) {
+    this(markets, repository, auditExporter, auditDirectory, securities, inventory, metrics, null);
+  }
+
+  public AdminExchangeService(
+      Map<String, PersistentOrderService> markets, ExchangeRepository repository,
+      AuditExporter auditExporter, Path auditDirectory, SecurityService securities,
+      InventoryGateway inventory, ExchangeMetrics metrics,
+      BiConsumer<String, Boolean> securityCreated) {
     this.markets = Map.copyOf(Objects.requireNonNull(markets, "markets"));
     this.repository = repository;
     this.auditExporter = auditExporter;
@@ -81,6 +91,7 @@ public final class AdminExchangeService {
     this.securities = securities;
     this.inventory = inventory;
     this.metrics = metrics;
+    this.securityCreated = securityCreated;
   }
 
   /** Combined operational health view: metrics, recent alerts and pending transfer reviews. */
@@ -136,9 +147,20 @@ public final class AdminExchangeService {
       UUID actorId, UUID requestId, String marketId, String symbol, String name,
       String description, String currencyId, java.math.BigDecimal basePrice,
       long totalSupply, long minimumUnit) throws SQLException {
-    return requireSecurities().create(
+    SecurityMutationResult result = requireSecurities().create(
         actorId, requestId, marketId, symbol, name, description, currencyId,
         basePrice, totalSupply, minimumUnit);
+    BiConsumer<String, Boolean> hook = securityCreated;
+    if (hook != null) {
+      try {
+        hook.accept(marketId, result.replayed());
+      } catch (RuntimeException failure) {
+        throw new IllegalStateException(
+            "created-but-not-attached:" + marketId
+                + "; run /qse reload to restore the runtime", failure);
+      }
+    }
+    return result;
   }
 
   public SecurityMutationResult securityIssue(

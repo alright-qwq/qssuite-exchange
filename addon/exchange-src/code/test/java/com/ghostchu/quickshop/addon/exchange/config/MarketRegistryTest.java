@@ -202,6 +202,50 @@ class MarketRegistryTest {
     assertThat(registry.versions("concept_alpha")).isEqualTo(new MarketRegistry.Versions(1, 1, 1));
   }
 
+  @Test
+  void addMarketPublishesNewVirtualSecurityImmediately() {
+    MarketRegistry registry = new MarketRegistry(Map.of("concept_alpha", virtualDefinition("ALPHA")));
+    MarketDefinition beta = new MarketDefinition("concept_beta", "Beta", false, null,
+        new MarketDefinition.StructuralRules("default", new BigDecimal("20.00"),
+            BigDecimal.ONE, new BigDecimal("200.00"), new BigDecimal("0.01"), 2, 2,
+            1, 2000, 200),
+        new MarketDefinition.RiskRules(new BigDecimal("0.001"), new BigDecimal("0.002"),
+            new BigDecimal("0.20"), new BigDecimal("0.05"), new BigDecimal("0.20"),
+            new BigDecimal("0.10"), 120, new BigDecimal("0.20"), 600, 100000,
+            new BigDecimal("10000000.00"), 100, 5, 60), false,
+        AssetType.VIRTUAL_SECURITY,
+        new SecurityDefinition("BETA", "Beta Holdings", "Concept stock", "default",
+            new BigDecimal("20.00"), 2000, 1));
+
+    registry.addMarket(beta);
+
+    assertThat(registry.marketIds()).contains("concept_beta");
+    assertThat(registry.require("concept_beta").security().symbol()).isEqualTo("BETA");
+    assertThat(registry.versions("concept_beta"))
+        .isEqualTo(new MarketRegistry.Versions(1, 1, 1));
+    assertThatThrownBy(() -> registry.addMarket(beta))
+        .hasMessageContaining("already exists");
+  }
+
+  @Test
+  void addMarketRejectsDuplicateSecuritySymbol() {
+    MarketRegistry registry = new MarketRegistry(Map.of("concept_alpha", virtualDefinition("ALPHA")));
+    MarketDefinition duplicateSymbol = new MarketDefinition("concept_other", "Other", false, null,
+        new MarketDefinition.StructuralRules("default", new BigDecimal("10.00"),
+            BigDecimal.ONE, new BigDecimal("100.00"), new BigDecimal("0.01"), 2, 2,
+            1, 1000, 100),
+        new MarketDefinition.RiskRules(new BigDecimal("0.001"), new BigDecimal("0.002"),
+            new BigDecimal("0.20"), new BigDecimal("0.05"), new BigDecimal("0.20"),
+            new BigDecimal("0.10"), 120, new BigDecimal("0.20"), 600, 100000,
+            new BigDecimal("10000000.00"), 100, 5, 60), false,
+        AssetType.VIRTUAL_SECURITY,
+        new SecurityDefinition("ALPHA", "Duplicate alpha", "Concept stock", "default",
+            new BigDecimal("10.00"), 1000, 1));
+
+    assertThatThrownBy(() -> registry.addMarket(duplicateSymbol))
+        .hasMessageContaining("security symbol already exists");
+  }
+
   private static MarketDefinition withRisk(MarketDefinition definition, BigDecimal priceCageRatio) {
     MarketDefinition.RiskRules risk = definition.risk();
     return new MarketDefinition(definition.marketId(), definition.displayName(),

@@ -14,12 +14,31 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminExchangeServiceTest {
+  @Test
+  void securityCreateNotifiesLiveMarketAttachmentHook() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    List<String> attached = new ArrayList<>();
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository(), null, null,
+        new com.ghostchu.quickshop.addon.exchange.security.SecurityService(fixture.repository()),
+        null, null, (marketId, replayed) -> attached.add(marketId + ":" + replayed));
+    UUID actor = UUID.randomUUID();
+
+    var result = admin.securityCreate(actor, UUID.randomUUID(), "new_alpha", "NALPHA",
+        "New Alpha", "New concept stock", "default", new BigDecimal("10.00"), 1000, 1);
+
+    assertThat(result.replayed()).isFalse();
+    assertThat(attached).containsExactly("new_alpha:false");
+  }
+
   @Test
   void auditStatusCombinesMetricsAlertsAndPendingReviews() throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();

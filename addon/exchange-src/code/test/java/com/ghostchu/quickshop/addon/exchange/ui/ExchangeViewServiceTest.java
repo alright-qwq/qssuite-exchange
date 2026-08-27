@@ -280,6 +280,25 @@ class ExchangeViewServiceTest {
     assertThat(views.resolveMarketIdBySymbol("BETA")).isNull();
   }
 
+  @Test
+  void addMarketMakesNewSecurityImmediatelyResolvable() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    MarketDataService marketData = new MarketDataService(new CandleAggregator());
+    ExchangeViewService views = new ExchangeViewService(java.util.Map.of("concept_alpha",
+        new ExchangeViewService.MarketView("concept_alpha", "Alpha", fixture.service(),
+            "VIRTUAL_SECURITY", "ALPHA", 1000L, () -> "OPEN", () -> 400L)),
+        marketData, Runnable::run);
+
+    views.addMarket(new ExchangeViewService.MarketView("concept_beta", "Beta",
+        fixture.service(), "VIRTUAL_SECURITY", "BETA", 2000L, () -> "CLOSED", () -> 0L));
+
+    assertThat(views.resolveMarketIdBySymbol("beta")).isEqualTo("concept_beta");
+    assertThat(views.securitySymbols()).contains("ALPHA", "BETA");
+    assertThatThrownBy(() -> views.addMarket(new ExchangeViewService.MarketView(
+        "concept_alpha", "Alpha", fixture.service())))
+        .hasMessageContaining("already exists");
+  }
+
   private static final class RecordingRepository implements ExchangeRepository {
     private final Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), "diamond-usd",
         UUID.randomUUID(), OrderSide.BUY, OrderType.LIMIT, TimeInForce.GTC,
