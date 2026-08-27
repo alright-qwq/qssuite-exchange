@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 /** Small locale-aware adapter for player-visible exchange menu text. */
 final class ExchangeUiMessages {
   private final AddonMessageService messages;
-  private volatile int lastPriceScale = -1;
 
   ExchangeUiMessages(AddonMessageService messages) {
     this.messages = messages;
@@ -28,9 +27,9 @@ final class ExchangeUiMessages {
     return messages.message(key, locale, arguments);
   }
 
-  /** Formats a currency amount for the player's locale using the configured currency scale. */
+  /** Formats an aggregate or market-agnostic currency amount at the default two-decimal scale. */
   String formatCurrency(BigDecimal value) {
-    return formatCurrency(value, lastPriceScale);
+    return formatCurrency(value, 2);
   }
 
   /** Formats a currency amount with an explicit scale, falling back to two decimals. */
@@ -69,15 +68,6 @@ final class ExchangeUiMessages {
       }
     }
     return messages.message("ui-reject-fallback", locale, rawReason);
-  }
-
-  /** Records the latest price scale observed by a page render for aggregate displays. */
-  void notePriceScale(int priceScale) {
-    lastPriceScale = priceScale;
-  }
-
-  int lastPriceScale() {
-    return lastPriceScale;
   }
 
   /** Compact relative time like "3m ago", "2h ago", or "2026-08-26" for very old timestamps. */

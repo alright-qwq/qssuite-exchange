@@ -186,9 +186,6 @@ final class MyOrdersPage {
   private int marketPriceScale(String marketId) {
     ExchangeViewService.MarketView market = views.market(marketId);
     int scale = market == null ? -1 : market.service().marketRules().priceScale();
-    if (scale >= 0) {
-      messages.notePriceScale(scale);
-    }
     return scale;
   }
 }

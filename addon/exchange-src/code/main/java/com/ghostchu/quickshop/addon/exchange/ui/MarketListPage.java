@@ -243,8 +243,7 @@ final class MarketListPage {
                 overview.fallingCount()),
             messages.component(player, "ui-overview-volume", overview.totalVolume24h()),
             messages.component(player, "ui-overview-notional",
-                overview.totalNotional24h()
-                    .setScale(messages.lastPriceScale(), java.math.RoundingMode.HALF_UP).toPlainString()),
+                messages.formatCurrency(overview.totalNotional24h())),
             messages.component(player, "ui-overview-active", active),
             messages.component(player, "ui-overview-gainer", gainer),
             messages.component(player, "ui-overview-loser", loser)))).withSlot(4).build());
@@ -260,9 +259,6 @@ final class MarketListPage {
   private int priceScale(MarketRow row) {
     ExchangeViewService.MarketView market = views.market(row.marketId());
     int scale = market == null ? -1 : market.service().marketRules().priceScale();
-    if (scale >= 0) {
-      messages.notePriceScale(scale);
-    }
     return scale;
   }
 

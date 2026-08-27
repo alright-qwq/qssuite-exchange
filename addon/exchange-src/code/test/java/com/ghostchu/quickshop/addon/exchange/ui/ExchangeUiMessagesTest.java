@@ -24,14 +24,12 @@ class ExchangeUiMessagesTest {
   }
 
   @Test
-  void remembersLatestPriceScaleForAggregateDisplays() {
+  void formatsAggregateAmountsAtStableTwoDecimals() {
     ExchangeUiMessages messages = new ExchangeUiMessages(
         new AddonMessageService(Map.of("en-US", Map.of())));
 
-    messages.notePriceScale(3);
-
-    assertThat(messages.lastPriceScale()).isEqualTo(3);
-    assertThat(messages.formatCurrency(new BigDecimal("1.005"))).isEqualTo("1.005");
+    assertThat(messages.formatCurrency(new BigDecimal("1.005"))).isEqualTo("1.01");
+    assertThat(messages.formatCurrency(new BigDecimal("999.999"))).isEqualTo("1000.00");
   }
 
   @Test
