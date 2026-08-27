@@ -134,7 +134,12 @@ public final class MarketRegistry {
       Entry candidate = new Entry(current);
       MarketDefinition next = replacement.getValue();
       boolean versionChanged = false;
-      if (!sameCustodyStructure(current.definition, next)) {
+      boolean structural = !sameCustodyStructure(current.definition, next);
+      boolean feeChange = feeRates(current.definition).makerRate()
+              .compareTo(feeRates(next).makerRate()) != 0
+          || feeRates(current.definition).takerRate().compareTo(feeRates(next).takerRate()) != 0;
+      boolean riskChange = !semanticRiskEqual(current.definition.risk(), next.risk());
+      if (structural) {
         MarketStateReader.State state = stateReader.read(replacement.getKey());
         if (state.status() != MarketStatus.PAUSED || state.openOrders() != 0) {
           throw new IllegalStateException(
@@ -143,14 +148,13 @@ public final class MarketRegistry {
         candidate.structuralVersion++;
         versionChanged = true;
       }
-      if (!current.definition.risk().equals(next.risk())) {
+      if (structural || riskChange || feeChange) {
         candidate.riskVersion++;
         versionChanged = true;
-        if (current.definition.risk().makerFeeRate().compareTo(next.risk().makerFeeRate()) != 0
-            || current.definition.risk().takerFeeRate().compareTo(next.risk().takerFeeRate()) != 0) {
-          candidate.feeVersion++;
-          candidate.feeSchedule.put(candidate.feeVersion, feeRates(next));
-        }
+      }
+      if (feeChange) {
+        candidate.feeVersion++;
+        candidate.feeSchedule.put(candidate.feeVersion, feeRates(next));
       }
       candidate.definition = next;
       candidates.put(replacement.getKey(), candidate);
@@ -226,6 +230,28 @@ public final class MarketRegistry {
         market.getLong("max-account-holding"), decimal(market, "max-frozen-currency"),
         market.getInt("max-open-orders"), riskDefaults.getInt("operations-per-second"),
         riskDefaults.getInt("operations-per-minute"));
+  }
+
+  private static boolean semanticRiskEqual(MarketDefinition.RiskRules first,
+                                            MarketDefinition.RiskRules second) {
+    return decimalEqual(first.makerFeeRate(), second.makerFeeRate())
+        && decimalEqual(first.takerFeeRate(), second.takerFeeRate())
+        && decimalEqual(first.priceCageRatio(), second.priceCageRatio())
+        && decimalEqual(first.defaultMarketSlippage(), second.defaultMarketSlippage())
+        && decimalEqual(first.maximumMarketSlippage(), second.maximumMarketSlippage())
+        && decimalEqual(first.levelOneMove(), second.levelOneMove())
+        && first.levelOneHaltSeconds() == second.levelOneHaltSeconds()
+        && decimalEqual(first.levelTwoMove(), second.levelTwoMove())
+        && first.levelTwoHaltSeconds() == second.levelTwoHaltSeconds()
+        && first.maxAccountHolding() == second.maxAccountHolding()
+        && decimalEqual(first.maxFrozenCurrency(), second.maxFrozenCurrency())
+        && first.maxOpenOrders() == second.maxOpenOrders()
+        && first.operationsPerSecond() == second.operationsPerSecond()
+        && first.operationsPerMinute() == second.operationsPerMinute();
+  }
+
+  private static boolean decimalEqual(BigDecimal first, BigDecimal second) {
+    return first.compareTo(second) == 0;
   }
 
   private static boolean sameCustodyStructure(MarketDefinition first, MarketDefinition second) {

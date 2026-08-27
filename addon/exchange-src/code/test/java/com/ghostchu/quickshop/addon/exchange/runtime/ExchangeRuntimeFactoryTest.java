@@ -90,6 +90,36 @@ class ExchangeRuntimeFactoryTest {
   }
 
   @Test
+  void reloadRejectsFeeChangesWithoutRestart() {
+    MarketDefinition diamond = fixtureDefinition("0.01", "0.001", "0.002");
+
+    assertThatIllegalArgumentException().isThrownBy(() ->
+        ExchangeRuntimeFactory.requireReloadableStructure(diamond,
+            fixtureDefinition("0.01", "0.010", "0.020")))
+        .withMessageContaining("fee");
+  }
+
+  @Test
+  void reloadAllowsRiskOnlyChangesAndIgnoresDecimalScaleDifferences() {
+    MarketDefinition diamond = fixtureDefinition("0.01", "0.001", "0.002");
+    MarketDefinition riskOnly = fixtureDefinition("0.01",
+        "0.0010", "0.0020");
+    MarketDefinition.RiskRules oldRisk = riskOnly.risk();
+    riskOnly = new MarketDefinition(riskOnly.marketId(), riskOnly.displayName(),
+        riskOnly.enabled(), riskOnly.item(), riskOnly.structural(),
+        new MarketDefinition.RiskRules(oldRisk.makerFeeRate(), oldRisk.takerFeeRate(),
+            new BigDecimal("0.30"), oldRisk.defaultMarketSlippage(),
+            oldRisk.maximumMarketSlippage(), oldRisk.levelOneMove(),
+            oldRisk.levelOneHaltSeconds(), oldRisk.levelTwoMove(),
+            oldRisk.levelTwoHaltSeconds(), oldRisk.maxAccountHolding(),
+            oldRisk.maxFrozenCurrency(), oldRisk.maxOpenOrders(),
+            oldRisk.operationsPerSecond(), oldRisk.operationsPerMinute()),
+        riskOnly.blockContainerShops(), riskOnly.assetType(), riskOnly.security());
+
+    assertThat(ExchangeRuntimeFactory.requireReloadableStructure(diamond, riskOnly)).isTrue();
+  }
+
+  @Test
   void mapsConfiguredAccountRiskLimitsIntoTheProductionService() {
     MarketDefinition.RiskRules rules = new MarketDefinition.RiskRules(
         new BigDecimal("0.001"), new BigDecimal("0.002"), new BigDecimal("0.20"),
@@ -103,5 +133,20 @@ class ExchangeRuntimeFactoryTest {
     assertThat(limits.maximumOpenOrders()).isEqualTo(9);
     assertThat(limits.operationsPerSecond()).isEqualTo(3);
     assertThat(limits.operationsPerMinute()).isEqualTo(17);
+  }
+
+  private static MarketDefinition fixtureDefinition(String tickSize, String makerRate,
+                                                    String takerRate) {
+    return new MarketDefinition("diamond", "Diamond", false,
+        new com.ghostchu.quickshop.addon.exchange.config.MarketDefinition.ItemDefinition(
+            com.ghostchu.quickshop.addon.exchange.platform.FingerprintMode.VANILLA_MATERIAL,
+            "DIAMOND", null, null),
+        new MarketDefinition.StructuralRules("default", new BigDecimal("100.00"),
+            BigDecimal.ONE, new BigDecimal("10000.00"), new BigDecimal(tickSize), 2, 2,
+            1, 2304, 100),
+        new MarketDefinition.RiskRules(new BigDecimal(makerRate), new BigDecimal(takerRate),
+            new BigDecimal("0.20"), new BigDecimal("0.05"), new BigDecimal("0.20"),
+            new BigDecimal("0.10"), 120, new BigDecimal("0.20"), 600, 100000,
+            new BigDecimal("10000000.00"), 100, 5, 60), false);
   }
 }

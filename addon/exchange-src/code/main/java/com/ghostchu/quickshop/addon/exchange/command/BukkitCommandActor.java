@@ -62,6 +62,11 @@ public final class BukkitCommandActor implements CommandActor {
   }
 
   @Override
+  public void commandFailed() {
+    player.sendMessage(messages.message("command-failed", locale));
+  }
+
+  @Override
   public void reloadRequested() {
     player.sendMessage(messages.message("reload-requested", locale));
     reloadAction.run();

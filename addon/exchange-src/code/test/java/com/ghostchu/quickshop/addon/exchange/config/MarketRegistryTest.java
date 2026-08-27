@@ -68,6 +68,40 @@ class MarketRegistryTest {
   }
 
   @Test
+  void riskOnlyReloadAdvancesRiskVersionWithoutConsultingState() {
+    MarketRegistry registry = new MarketRegistry(Map.of(
+        "minecraft_diamond/default", definition("0.01")));
+    boolean[] stateRead = {false};
+    MarketStateReader state = market -> {
+      stateRead[0] = true;
+      return new MarketStateReader.State(MarketStatus.OPEN, 3);
+    };
+
+    registry.reload(Map.of("minecraft_diamond/default",
+        withRisk(definition("0.01"), new BigDecimal("0.30"))), state);
+
+    assertThat(stateRead[0]).isFalse();
+    assertThat(registry.require("minecraft_diamond/default").risk().priceCageRatio())
+        .isEqualByComparingTo("0.30");
+    assertThat(registry.versions("minecraft_diamond/default"))
+        .isEqualTo(new MarketRegistry.Versions(1, 2, 1));
+  }
+
+  @Test
+  void equalDecimalsWithDifferentScalesReloadWithoutVersionChange() {
+    MarketRegistry registry = new MarketRegistry(Map.of(
+        "minecraft_diamond/default", definition("0.01", "0.001", "0.002")));
+    MarketDefinition sameValue = definition("0.01",
+        new BigDecimal("0.0010").toString(), new BigDecimal("0.0020").toString());
+
+    registry.reload(Map.of("minecraft_diamond/default", sameValue),
+        market -> new MarketStateReader.State(MarketStatus.OPEN, 3));
+
+    assertThat(registry.versions("minecraft_diamond/default"))
+        .isEqualTo(new MarketRegistry.Versions(1, 1, 1));
+  }
+
+  @Test
   void rejectsTickSizeBeyondConfiguredPriceScale() {
     assertThatThrownBy(() -> definition("0.001"))
         .isInstanceOf(IllegalArgumentException.class)
@@ -166,6 +200,18 @@ class MarketRegistryTest {
 
     assertThat(registry.require("concept_alpha").security().symbol()).isEqualTo("ALPHA");
     assertThat(registry.versions("concept_alpha")).isEqualTo(new MarketRegistry.Versions(1, 1, 1));
+  }
+
+  private static MarketDefinition withRisk(MarketDefinition definition, BigDecimal priceCageRatio) {
+    MarketDefinition.RiskRules risk = definition.risk();
+    return new MarketDefinition(definition.marketId(), definition.displayName(),
+        definition.enabled(), definition.item(), definition.structural(),
+        new MarketDefinition.RiskRules(risk.makerFeeRate(), risk.takerFeeRate(),
+            priceCageRatio, risk.defaultMarketSlippage(), risk.maximumMarketSlippage(),
+            risk.levelOneMove(), risk.levelOneHaltSeconds(), risk.levelTwoMove(),
+            risk.levelTwoHaltSeconds(), risk.maxAccountHolding(), risk.maxFrozenCurrency(),
+            risk.maxOpenOrders(), risk.operationsPerSecond(), risk.operationsPerMinute()),
+        definition.blockContainerShops(), definition.assetType(), definition.security());
   }
 
   private static MarketDefinition definition(String tickSize) {

@@ -564,7 +564,7 @@ class PersistentOrderServiceTest {
     assertThat(fixture.latestOrderFeeVersion()).isEqualTo(2);
     assertThat(fixture.latestOrderConfigVersion()).isEqualTo(2);
     assertThat(restartedRegistry.versions("diamond-usd"))
-        .isEqualTo(new MarketRegistry.Versions(2, 2, 2));
+        .isEqualTo(new MarketRegistry.Versions(2, 3, 2));
   }
 
   @Test
@@ -581,7 +581,7 @@ class PersistentOrderServiceTest {
         fixture.marketDefinition("0.01", "0.001", "0.002", 3)), fixture.repository());
     assertThat(restarted.require("diamond-usd").structural().currencyScale()).isEqualTo(3);
     assertThat(restarted.versions("diamond-usd"))
-        .isEqualTo(new MarketRegistry.Versions(2, 1, 1));
+        .isEqualTo(new MarketRegistry.Versions(2, 2, 1));
   }
 
   @Test

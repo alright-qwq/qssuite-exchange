@@ -53,6 +53,16 @@ public final class ExchangeCommandRouter {
       invalid(actor);
       return;
     }
+    try {
+      executeGuarded(actor, args);
+    } catch (RuntimeException failure) {
+      // A single bad command or a transient runtime fault must never take down the command
+      // pipeline: report the failure to the player and keep the plugin usable.
+      actor.commandFailed();
+    }
+  }
+
+  private void executeGuarded(CommandActor actor, String[] args) {
     if (args.length > 0 && "admin".equalsIgnoreCase(args[0])) {
       if (args.length == 1) {
         if (!hasAnyAdminPermission(actor)) {

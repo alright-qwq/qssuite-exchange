@@ -3,8 +3,8 @@ package com.ghostchu.quickshop.addon.exchange.runtime;
 import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.config.AssetType;
 import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
-import com.ghostchu.quickshop.addon.exchange.config.MarketStateReader;
 import com.ghostchu.quickshop.addon.exchange.config.MarketRegistry;
+import com.ghostchu.quickshop.addon.exchange.config.MarketStateReader;
 import com.ghostchu.quickshop.addon.exchange.core.model.MarketRules;
 import com.ghostchu.quickshop.addon.exchange.core.model.MarketStatus;
 import com.ghostchu.quickshop.addon.exchange.core.risk.AccountOrderLimits;
@@ -289,14 +289,57 @@ public final class ExchangeRuntimeFactory {
       throw new IllegalStateException(
           "market set cannot change during reload; pause markets and restart to apply structural changes");
     }
-    liveRegistry.reload(reloaded.definitions(), market ->
-        new MarketStateReader.State(MarketStatus.PAUSED, 0));
     for (String marketId : liveMarkets.keySet()) {
+      MarketDefinition current = liveRegistry.require(marketId);
       MarketDefinition next = reloaded.require(marketId);
+      requireReloadableStructure(current, next);
+    }
+    // The structure is unchanged, so the state reader is never consulted: reload only advances
+    // risk/fee versions, persists them atomically and swaps the live definitions in one step.
+    liveRegistry.reload(reloaded.definitions(),
+        ignored -> new MarketStateReader.State(MarketStatus.PAUSED, 0));
+    for (String marketId : liveMarkets.keySet()) {
+      MarketDefinition next = liveRegistry.require(marketId);
       PersistentOrderService service = liveMarkets.get(marketId);
       service.updateRiskLimits(limits(next), accountLimits(next.risk()));
     }
     this.registry = liveRegistry;
+  }
+
+  static boolean requireReloadableStructure(
+      MarketDefinition current, MarketDefinition next) {
+    if (!sameCustodyStructure(current, next) || feeRatesDiffer(current, next)) {
+      throw new IllegalArgumentException(
+          "structural or fee changes require a paused market with no open orders;"
+              + " apply them manually or restart the server");
+    }
+    return true;
+  }
+
+  private static boolean sameCustodyStructure(MarketDefinition first, MarketDefinition second) {
+    return first.assetType() == second.assetType()
+        && java.util.Objects.equals(first.item(), second.item())
+        && java.util.Objects.equals(first.security(), second.security())
+        && sameStructuralRules(first.structural(), second.structural());
+  }
+
+  private static boolean sameStructuralRules(MarketDefinition.StructuralRules first,
+                                             MarketDefinition.StructuralRules second) {
+    return first.currencyId().equals(second.currencyId())
+        && first.basePrice().compareTo(second.basePrice()) == 0
+        && first.minPrice().compareTo(second.minPrice()) == 0
+        && first.maxPrice().compareTo(second.maxPrice()) == 0
+        && first.tickSize().compareTo(second.tickSize()) == 0
+        && first.priceScale() == second.priceScale()
+        && first.currencyScale() == second.currencyScale()
+        && first.minQuantity() == second.minQuantity()
+        && first.maxQuantity() == second.maxQuantity()
+        && first.discoveryQuantity() == second.discoveryQuantity();
+  }
+
+  private static boolean feeRatesDiffer(MarketDefinition first, MarketDefinition second) {
+    return first.risk().makerFeeRate().compareTo(second.risk().makerFeeRate()) != 0
+        || first.risk().takerFeeRate().compareTo(second.risk().takerFeeRate()) != 0;
   }
 
   static void flushWhileOwned(SingleWriterGuard writer, MarketDataService marketData, Instant at) {

@@ -21,6 +21,9 @@ public interface CommandActor {
     openMenu(request.menuName(), request.page());
   }
 
+  /** Reports a command-level failure that must not propagate to the platform command pipeline. */
+  default void commandFailed() {}
+
   /** Requests an administrator-triggered configuration reload. */
   default void reloadRequested() {}
 }

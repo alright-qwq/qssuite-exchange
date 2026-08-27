@@ -126,12 +126,6 @@ public final class ExchangeRuntime implements AutoCloseable {
     return actions;
   }
 
-  /** Applies reloaded operational settings while keeping the live order book untouched. */
-  public void reloadRuntime(java.util.function.Consumer<ExchangeRuntime> reloader) {
-    Objects.requireNonNull(reloader, "reloader");
-    reloader.accept(this);
-  }
-
   /** Executes a command mutation while writer ownership remains fenced. */
   public boolean runWhileWriting(CheckedRunnable work) throws Exception {
     Objects.requireNonNull(work, "work");

@@ -82,7 +82,7 @@ public final class PersistentOrderService {
   private final RecoveryHandler recovery;
   private final SettlementObserver observer;
   private final MarketDataService marketData;
-  private final OrderBookRecoveryService marketRecovery;
+  private volatile OrderBookRecoveryService marketRecovery;
   private final MarketRuntimeState runtimeState;
 
   public MarketRules marketRules() {
@@ -101,6 +101,11 @@ public final class PersistentOrderService {
     this.accountLimits.set(accountLimits);
     orderRisks.set(new OrderRiskService(new OrderRateLimiter(
         accountLimits.operationsPerSecond(), accountLimits.operationsPerMinute())));
+    this.marketRecovery = new OrderBookRecoveryService(repository, rules, limits);
+    synchronized (runtimeState) {
+      runtimeState.circuitBreaker = CircuitBreaker.restored(
+          limits, runtimeState.circuitBreaker.level(), runtimeState.circuitBreaker.haltedUntil());
+    }
   }
 
   /** Production wiring should prefer the constructor that supplies a recovery handler. */

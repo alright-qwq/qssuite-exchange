@@ -96,6 +96,7 @@ public final class Main extends JavaPlugin implements Listener {
     try {
       reloadConfig();
       factory.reloadConfig();
+      rewirePlayerEntrypoints();
       getLogger().info("Exchange configuration reloaded successfully");
     } catch (Exception failure) {
       getLogger().log(Level.SEVERE,
@@ -104,9 +105,26 @@ public final class Main extends JavaPlugin implements Listener {
   }
 
   private void registerPlayerEntrypoints() {
-    AddonMessageService messages = AddonMessageService.load(
-        new File(getDataFolder(), "messages.yml"));
+    AddonMessageService messages = buildMessages();
     RolloutPolicy rollout = rolloutPolicy();
+    installPlayerEntrypoints(messages, rollout);
+  }
+
+  private void rewirePlayerEntrypoints() {
+    // Build and validate every replacement first so a malformed message/rollout configuration
+    // can never leave the plugin without command or GUI entry points.
+    AddonMessageService messages = buildMessages();
+    RolloutPolicy rollout = rolloutPolicy();
+    unregisterPlayerEntrypoints();
+    installPlayerEntrypoints(messages, rollout);
+  }
+
+  private AddonMessageService buildMessages() {
+    return AddonMessageService.load(
+        new File(getDataFolder(), "messages.yml"));
+  }
+
+  private void installPlayerEntrypoints(AddonMessageService messages, RolloutPolicy rollout) {
     menus = new ExchangeMenuService(runtime.views(), new RuntimeExchangeRequestSubmitter(runtime),
         rollout, messages);
     menuListener = new ExchangeMenuListener(menus);

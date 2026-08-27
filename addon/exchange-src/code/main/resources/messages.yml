@@ -19,6 +19,7 @@ en-US:
   reload-requested: Exchange configuration reload requested; the result will appear in the server console.
   admin-transfer-review-list: 'Transfers awaiting review:\n<0>'
   admin-transfer-review-detail: 'Transfer review detail: <0>'
+  command-failed: The exchange command could not be completed. Please try again or check the server console.
   ui-data-unavailable: Exchange data is currently unavailable.
   ui-history-trade-title: '<0> trade @ <1>'
   ui-history-trade-id: 'Trade #<0>'
