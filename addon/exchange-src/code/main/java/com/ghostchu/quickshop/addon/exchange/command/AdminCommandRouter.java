@@ -50,32 +50,38 @@ public final class AdminCommandRouter {
       actor.message("admin-command-invalid");
       return;
     }
-    if ("audit".equalsIgnoreCase(args[0])) {
-      audit(actor, args);
-      return;
-    }
-    if ("transfer".equalsIgnoreCase(args[0])) {
-      transferReview(actor, args);
-      return;
-    }
-    if ("stock".equalsIgnoreCase(args[0])) {
-      stock(actor, args);
-      return;
-    }
-    if (args.length < 4) {
+    try {
+      if ("audit".equalsIgnoreCase(args[0])) {
+        audit(actor, args);
+        return;
+      }
+      if ("transfer".equalsIgnoreCase(args[0])) {
+        transferReview(actor, args);
+        return;
+      }
+      if ("stock".equalsIgnoreCase(args[0])) {
+        stock(actor, args);
+        return;
+      }
+      if (args.length < 4) {
+        actor.message("admin-command-invalid");
+        return;
+      }
+      if ("order".equalsIgnoreCase(args[0]) && "cancel".equalsIgnoreCase(args[1])) {
+        cancelOrder(actor, args);
+        return;
+      }
+      if ("market".equalsIgnoreCase(args[0])
+          && ("pause".equalsIgnoreCase(args[1]) || "resume".equalsIgnoreCase(args[1]))) {
+        changeMarketStatus(actor, args);
+        return;
+      }
       actor.message("admin-command-invalid");
-      return;
+    } catch (RuntimeException failure) {
+      LOGGER.log(java.util.logging.Level.SEVERE,
+          "Exchange admin command failed for account " + actor.accountId(), failure);
+      actor.message("admin-command-failed");
     }
-    if ("order".equalsIgnoreCase(args[0]) && "cancel".equalsIgnoreCase(args[1])) {
-      cancelOrder(actor, args);
-      return;
-    }
-    if ("market".equalsIgnoreCase(args[0])
-        && ("pause".equalsIgnoreCase(args[1]) || "resume".equalsIgnoreCase(args[1]))) {
-      changeMarketStatus(actor, args);
-      return;
-    }
-    actor.message("admin-command-invalid");
   }
 
   private void stock(CommandActor actor, String[] args) {
@@ -228,9 +234,14 @@ public final class AdminCommandRouter {
     } catch (IllegalArgumentException invalid) {
       actor.message("admin-command-invalid");
     } catch (Exception failure) {
+      LOGGER.log(java.util.logging.Level.SEVERE,
+          "Exchange admin command failed for account " + actor.accountId(), failure);
       actor.message("admin-command-failed");
     }
   }
+
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.AdminCommand");
 
   private static String auditStatusSummary(AdminExchangeService.AuditStatus status) {
     java.util.Map<String, com.ghostchu.quickshop.addon.exchange.operations.MetricSnapshot.MarketMetrics>

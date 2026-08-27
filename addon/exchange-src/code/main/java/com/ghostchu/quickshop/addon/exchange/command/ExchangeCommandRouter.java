@@ -58,9 +58,14 @@ public final class ExchangeCommandRouter {
     } catch (RuntimeException failure) {
       // A single bad command or a transient runtime fault must never take down the command
       // pipeline: report the failure to the player and keep the plugin usable.
+      LOGGER.log(java.util.logging.Level.SEVERE,
+          "Exchange command failed for account " + actor.accountId(), failure);
       actor.commandFailed();
     }
   }
+
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.Command");
 
   private void executeGuarded(CommandActor actor, String[] args) {
     if (args.length > 0 && "admin".equalsIgnoreCase(args[0])) {

@@ -87,6 +87,21 @@ class ExchangeCommandRouterTest {
   }
 
   @Test
+  void catchesUnexpectedRuntimeFailuresAndReportsCommandFailure() {
+    Actor actor = new Actor("quickshop.exchange.use");
+    ExchangeCommandRouter router = new ExchangeCommandRouter(
+        UUID::randomUUID, null, RolloutPolicy.DISABLED,
+        symbol -> {
+          throw new IllegalStateException("resolver exploded");
+        });
+
+    router.execute(actor, new String[] {"stock", "ALPHA"});
+
+    assertThat(actor.commandFailed).isTrue();
+    assertThat(actor.opened).isNull();
+  }
+
+  @Test
   void tabCompletesStockSymbolsFromTheRegistry() {
     ExchangeCommandRouter router = new ExchangeCommandRouter(
         UUID::randomUUID, null, RolloutPolicy.DISABLED, Function.identity(),
@@ -253,6 +268,7 @@ class ExchangeCommandRouterTest {
     private String message;
     private ExchangeMenuRequest opened;
     private boolean reloaded;
+    private boolean commandFailed;
     private Actor(String... permission) { permissions.addAll(java.util.Arrays.asList(permission)); }
     public UUID accountId() { return accountId; }
     public boolean hasPermission(String permission) { return permissions.contains(permission); }
@@ -262,5 +278,6 @@ class ExchangeCommandRouterTest {
     public void openMenu(String menuName, int page) { }
     public void openMenu(ExchangeMenuRequest request) { opened = request; }
     public void reloadRequested() { reloaded = true; }
+    @Override public void commandFailed() { commandFailed = true; }
   }
 }
