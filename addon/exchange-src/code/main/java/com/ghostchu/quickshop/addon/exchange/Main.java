@@ -70,6 +70,15 @@ public final class Main extends JavaPlugin implements Listener {
    * runtime teardown because it first releases any previous runtime and entry points.
    */
   private void startExchange() throws Exception {
+    ExchangeRuntimeFactory previousFactory = runtimeFactory;
+    if (previousFactory != null) {
+      try {
+        previousFactory.closeListeners();
+      } catch (Exception cleanupFailure) {
+        getLogger().log(Level.SEVERE,
+            "Exchange previous listener cleanup failed", cleanupFailure);
+      }
+    }
     ShutdownSequence.close(this::unregisterPlayerEntrypoints,
         () -> {
           if (runtime != null) {
@@ -96,6 +105,7 @@ public final class Main extends JavaPlugin implements Listener {
 
   private void cleanupAfterFailedStart() {
     ExchangeRuntime failedRuntime = runtime;
+    ExchangeRuntimeFactory failedFactory = runtimeFactory;
     runtime = null;
     runtimeFactory = null;
     mainListenerRegistered = false;
@@ -106,11 +116,20 @@ public final class Main extends JavaPlugin implements Listener {
           }
         }, cleanupFailure -> getLogger().log(Level.SEVERE,
             "Exchange startup cleanup failed", cleanupFailure));
+    if (failedFactory != null) {
+      try {
+        failedFactory.closeListeners();
+      } catch (Exception cleanupFailure) {
+        getLogger().log(Level.SEVERE,
+            "Exchange startup listener cleanup failed", cleanupFailure);
+      }
+    }
   }
 
   @Override
   public void onDisable() {
     ExchangeRuntime activeRuntime = runtime;
+    ExchangeRuntimeFactory activeFactory = runtimeFactory;
     mainListenerRegistered = false;
     ShutdownSequence.close(this::unregisterPlayerEntrypoints,
         () -> {
@@ -120,6 +139,13 @@ public final class Main extends JavaPlugin implements Listener {
         }, failure -> getLogger().log(Level.SEVERE, "Exchange shutdown cleanup failed", failure));
     runtime = null;
     runtimeFactory = null;
+    if (activeFactory != null) {
+      try {
+        activeFactory.closeListeners();
+      } catch (Exception cleanupFailure) {
+        getLogger().log(Level.SEVERE, "Exchange listener cleanup failed", cleanupFailure);
+      }
+    }
   }
 
   @EventHandler(ignoreCancelled = true)

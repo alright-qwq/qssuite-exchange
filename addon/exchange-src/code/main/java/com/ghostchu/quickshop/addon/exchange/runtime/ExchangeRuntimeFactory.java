@@ -83,6 +83,8 @@ public final class ExchangeRuntimeFactory {
   private volatile int candleRetentionDays = 365;
   private volatile int reconciliationIntervalMinutes = 1440;
   private volatile ScheduledFuture<?> reconciliationTask;
+  private volatile org.bukkit.event.Listener containerShopListener;
+  private volatile org.bukkit.event.Listener transferLoginListener;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
     this.addon = java.util.Objects.requireNonNull(addon, "addon");
@@ -168,7 +170,9 @@ public final class ExchangeRuntimeFactory {
         "qs-exchange-recovery-fence-", Duration.ofSeconds(30));
     TransferRecoveryService transfers = new TransferRecoveryService(
         repository, repository, inventory, recoveryExecutor);
-    Bukkit.getPluginManager().registerEvents(new ContainerShopPolicyListener(registry), addon);
+    ContainerShopPolicyListener containerShop = new ContainerShopPolicyListener(registry);
+    this.containerShopListener = containerShop;
+    Bukkit.getPluginManager().registerEvents(containerShop, addon);
 
     AutoCloseable dispatcher = () -> {};
     this.maintenance = Executors.newSingleThreadScheduledExecutor(
@@ -285,11 +289,14 @@ public final class ExchangeRuntimeFactory {
             playerOperations.close();
             runWhileOwnedOrThrow(database.writer(), () -> marketData.flush(Instant.now()));
           }, views, administration, actions);
-      Bukkit.getPluginManager().registerEvents(new TransferLoginListener(accountId ->
+      TransferLoginListener transferLogin = new TransferLoginListener(accountId ->
           runtime.callAsyncWhileWriting(() -> transfers.recoverPlayer(accountId),
-              recoveryFenceExecutor)), addon);
+              recoveryFenceExecutor));
+      this.transferLoginListener = transferLogin;
+      Bukkit.getPluginManager().registerEvents(transferLogin, addon);
       return runtime;
     } catch (Exception failure) {
+      unregisterRuntimeListeners();
       if (this.maintenance != null) {
         this.maintenance.shutdownNow();
         this.maintenance = null;
@@ -300,6 +307,25 @@ public final class ExchangeRuntimeFactory {
       database.writer().close();
       throw failure;
     }
+  }
+
+  /** Unregisters runtime listeners so a failed create cannot leave half-wired handlers active. */
+  private void unregisterRuntimeListeners() {
+    org.bukkit.event.Listener containerShop = this.containerShopListener;
+    this.containerShopListener = null;
+    if (containerShop != null) {
+      org.bukkit.event.HandlerList.unregisterAll(containerShop);
+    }
+    org.bukkit.event.Listener transferLogin = this.transferLoginListener;
+    this.transferLoginListener = null;
+    if (transferLogin != null) {
+      org.bukkit.event.HandlerList.unregisterAll(transferLogin);
+    }
+  }
+
+  /** Releases any runtime-registered Bukkit listeners. Safe to call at any lifecycle point. */
+  public void closeListeners() {
+    unregisterRuntimeListeners();
   }
 
   /** Re-reads markets.yml/config.yml and hot-applies operational risk settings. */
