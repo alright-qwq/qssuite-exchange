@@ -40,6 +40,33 @@ class MarketDefinitionSecurityTest {
         BigDecimal.ONE, 10, 3)).isInstanceOf(IllegalArgumentException.class);
   }
 
+  @Test
+  void rejectsMarketMinimumQuantityThatDoesNotAlignWithSecurityUnit() {
+    assertThatThrownBy(() -> new MarketDefinition("ABC", "Alpha", true, null,
+        new MarketDefinition.StructuralRules("default", new BigDecimal("10.00"),
+            BigDecimal.ONE, new BigDecimal("1000.00"), new BigDecimal("0.01"), 2, 2,
+            5, 1000, 100),
+        risks(), false, AssetType.VIRTUAL_SECURITY,
+        new SecurityDefinition("ABC", "Alpha", "Concept stock", "default",
+            new BigDecimal("10.00"), 1_000, 2)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("market minimum quantity must align with security unit");
+  }
+
+  @Test
+  void acceptsMarketMinimumQuantityThatAlignsWithSecurityUnit() {
+    MarketDefinition definition = new MarketDefinition("ABC", "Alpha", true, null,
+        new MarketDefinition.StructuralRules("default", new BigDecimal("10.00"),
+            BigDecimal.ONE, new BigDecimal("1000.00"), new BigDecimal("0.01"), 2, 2,
+            4, 1000, 100),
+        risks(), false, AssetType.VIRTUAL_SECURITY,
+        new SecurityDefinition("ABC", "Alpha", "Concept stock", "default",
+            new BigDecimal("10.00"), 1_000, 2));
+
+    assertThat(definition.security().minimumUnit()).isEqualTo(2);
+    assertThat(definition.structural().minQuantity()).isEqualTo(4);
+  }
+
   private static MarketDefinition.StructuralRules rules() {
     return new MarketDefinition.StructuralRules("default", new BigDecimal("10.00"),
         BigDecimal.ONE, new BigDecimal("1000.00"), new BigDecimal("0.01"), 2, 2,
