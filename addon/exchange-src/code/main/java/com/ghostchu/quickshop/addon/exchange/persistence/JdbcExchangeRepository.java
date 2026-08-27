@@ -1438,6 +1438,20 @@ public final class JdbcExchangeRepository
     }
 
     @Override
+    public Optional<String> marketAssetType(String marketId) throws SQLException {
+      try (PreparedStatement query = connection.prepareStatement(
+          "SELECT asset_type FROM " + tables.markets() + " WHERE market_id=?")) {
+        query.setString(1, marketId);
+        try (ResultSet result = query.executeQuery()) {
+          if (!result.next()) {
+            return Optional.empty();
+          }
+          return Optional.ofNullable(result.getString("asset_type"));
+        }
+      }
+    }
+
+    @Override
     public void updateSecurityDefinition(SecurityDefinitionState definition, long expectedVersion)
         throws SQLException {
       Objects.requireNonNull(definition, "definition");

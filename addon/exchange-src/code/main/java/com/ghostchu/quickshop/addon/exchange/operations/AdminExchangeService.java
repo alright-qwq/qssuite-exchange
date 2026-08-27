@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiConsumer;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Coordinates audited administration through the market services that own live order books. */
 public final class AdminExchangeService {
@@ -35,7 +36,7 @@ public final class AdminExchangeService {
   private static final String RECONCILIATION_AUTO_PAUSE = "RECONCILIATION_AUTO_PAUSE";
   private static final String RECONCILIATION_DIFFERENCE = "RECONCILIATION_DIFFERENCE";
 
-  private final Map<String, PersistentOrderService> markets;
+  private final Map<String, PersistentOrderService> markets = new ConcurrentHashMap<>();
   private final ExchangeRepository repository;
   private final AuditExporter auditExporter;
   private final Path auditDirectory;
@@ -84,7 +85,7 @@ public final class AdminExchangeService {
       AuditExporter auditExporter, Path auditDirectory, SecurityService securities,
       InventoryGateway inventory, ExchangeMetrics metrics,
       BiConsumer<String, Boolean> securityCreated) {
-    this.markets = Map.copyOf(Objects.requireNonNull(markets, "markets"));
+    this.markets.putAll(Objects.requireNonNull(markets, "markets"));
     this.repository = repository;
     this.auditExporter = auditExporter;
     this.auditDirectory = auditDirectory;
@@ -161,6 +162,15 @@ public final class AdminExchangeService {
       }
     }
     return result;
+  }
+
+  /** Registers a hot-added market so administration commands can act on it immediately. */
+  public void registerMarket(String marketId, PersistentOrderService service) {
+    Objects.requireNonNull(marketId, "marketId");
+    Objects.requireNonNull(service, "service");
+    if (markets.putIfAbsent(marketId, service) != null) {
+      throw new IllegalArgumentException("market already exists in administration: " + marketId);
+    }
   }
 
   public SecurityMutationResult securityIssue(

@@ -76,6 +76,7 @@ public final class ExchangeRuntimeFactory {
   private volatile JdbcExchangeRepository repository;
   private volatile ExchangeActionService actions;
   private volatile ExchangeViewService views;
+  private volatile AdminExchangeService administration;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
     this.addon = java.util.Objects.requireNonNull(addon, "addon");
@@ -223,6 +224,7 @@ public final class ExchangeRuntimeFactory {
         markets, repository, new com.ghostchu.quickshop.addon.exchange.operations.AuditExporter(),
         auditDirectory, new SecurityService(repository), inventory, metrics,
         this::addSecurityMarket);
+    this.administration = administration;
     Runnable resumeHalted = () -> resumeExpiredHalts(repository, registry.marketIds(), database.writer());
     com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector detector =
         new com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector(Clock.systemUTC());
@@ -395,6 +397,10 @@ public final class ExchangeRuntimeFactory {
       this.actions = liveActions.withMarket(marketId, service);
       this.views = liveViews;
       liveViews.addMarket(view);
+      AdminExchangeService liveAdministration = this.administration;
+      if (liveAdministration != null) {
+        liveAdministration.registerMarket(marketId, service);
+      }
     }
   }
 

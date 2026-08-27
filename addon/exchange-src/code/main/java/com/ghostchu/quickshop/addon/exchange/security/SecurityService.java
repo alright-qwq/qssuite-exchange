@@ -77,7 +77,14 @@ public final class SecurityService {
       if (existing != null) {
         throw new IllegalArgumentException("security already exists for market: " + marketId);
       }
-      if (!tx.marketExists(marketId)) {
+      boolean marketRowExists = tx.marketExists(marketId);
+      if (marketRowExists) {
+        String assetType = tx.marketAssetType(marketId).orElse(null);
+        if (AssetType.PHYSICAL_ITEM.name().equals(assetType)) {
+          throw new IllegalArgumentException(
+              "cannot create a security on an existing physical market: " + marketId);
+        }
+      } else {
         // The persisted market row also materialises a CLOSED security row; it is promoted to
         // OPEN below instead of being inserted twice.
         tx.insertMarket(definition, false);

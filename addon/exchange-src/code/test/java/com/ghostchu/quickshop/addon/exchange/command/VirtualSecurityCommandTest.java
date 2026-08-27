@@ -170,8 +170,8 @@ class VirtualSecurityCommandTest {
            java.sql.Statement statement = connection.createStatement()) {
         statement.executeUpdate("INSERT INTO " + tables.markets()
             + " (market_id,currency_id,item_fingerprint,item_template,structural_payload,"
-            + "fee_schedule_payload,risk_payload,structural_version,risk_version,created_at)"
-            + " VALUES ('alpha','default','','','{}','{}','{}',1,1,0)");
+            + "fee_schedule_payload,risk_payload,asset_type,structural_version,risk_version,created_at)"
+            + " VALUES ('alpha','default','','','{}','{}','{}','VIRTUAL_SECURITY',1,1,0)");
         statement.executeUpdate("INSERT INTO " + tables.marketState()
             + " (market_id,status,priority_sequence,match_sequence,reference_price,last_price,"
             + "halted_until,discovery_quantity,circuit_breaker_level,version)"

@@ -114,6 +114,23 @@ class AdminExchangeServiceTest {
   }
 
   @Test
+  void registerMarketMakesForceCancelWorkWithoutRestart() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    UUID buyer = fixture.accountWithCurrency("500.00");
+    OrderReceipt receipt = fixture.service().place(new OrderRequest(
+        UUID.randomUUID(), buyer, fixture.rules().marketId(), OrderSide.BUY, "LIMIT",
+        new BigDecimal("100.00"), null, 2));
+    AdminExchangeService admin = new AdminExchangeService(Map.of());
+
+    admin.registerMarket(fixture.rules().marketId(), fixture.service());
+    admin.forceCancel(UUID.randomUUID(), UUID.randomUUID(), fixture.rules().marketId(),
+        receipt.orderId(), "hot-added market");
+
+    assertThat(fixture.orderStatus(receipt.orderId())).isEqualTo("CANCELLED");
+    assertThat(fixture.availableCurrency(buyer)).isEqualByComparingTo("500.00");
+  }
+
+  @Test
   void forceCancelReturnsReservedItemsForSellOrders() throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
     UUID seller = fixture.accountWithItems(3);

@@ -47,8 +47,8 @@ class SecurityServiceTest {
     try (Connection connection = connections.open(); Statement statement = connection.createStatement()) {
       statement.executeUpdate("INSERT INTO " + tables.markets()
           + " (market_id,currency_id,item_fingerprint,item_template,structural_payload,"
-          + "fee_schedule_payload,risk_payload,structural_version,risk_version,created_at)"
-          + " VALUES ('" + marketId + "','default','','','{}','{}','{}',1,1,0)");
+          + "fee_schedule_payload,risk_payload,asset_type,structural_version,risk_version,created_at)"
+          + " VALUES ('" + marketId + "','default','','','{}','{}','{}','VIRTUAL_SECURITY',1,1,0)");
       statement.executeUpdate("INSERT INTO " + tables.marketState()
           + " (market_id,status,priority_sequence,match_sequence,reference_price,last_price,"
           + "halted_until,discovery_quantity,circuit_breaker_level,version)"
@@ -104,6 +104,25 @@ class SecurityServiceTest {
     assertThat(definition.status()).isEqualTo("OPEN");
     assertThat(definition.totalSupply()).isEqualTo(1000);
     assertThat(definition.minimumUnit()).isEqualTo(1);
+  }
+
+  @Test
+  void createRejectsExistingPhysicalItemMarketRow() throws Exception {
+    try (Connection connection = connections.open(); Statement statement = connection.createStatement()) {
+      statement.executeUpdate("INSERT INTO " + tables.markets()
+          + " (market_id,currency_id,item_fingerprint,item_template,structural_payload,"
+          + "fee_schedule_payload,risk_payload,asset_type,structural_version,risk_version,created_at)"
+          + " VALUES ('physical_market','default','diamond','{}','{}','{}','{}','PHYSICAL_ITEM',1,1,0)");
+    }
+    UUID actor = UUID.randomUUID();
+
+    assertThatThrownBy(() -> service.create(actor, UUID.randomUUID(), "physical_market",
+        "DIA", "Diamond", "Physical market must not be repurposed", "default",
+        new BigDecimal("10.00"), 1000, 1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("physical market");
+    assertThat((Boolean) repository.inTransaction(
+        tx -> tx.existingSecurityDefinition("physical_market").isPresent())).isFalse();
   }
 
   @Test

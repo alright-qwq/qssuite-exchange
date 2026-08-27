@@ -50,6 +50,7 @@ public interface ExchangeTransaction {
   void insertSecurityDefinition(SecurityDefinitionState definition) throws SQLException;
   void insertMarket(MarketDefinition definition, boolean enabled) throws SQLException;
   boolean marketExists(String marketId) throws SQLException;
+  Optional<String> marketAssetType(String marketId) throws SQLException;
   void updateSecurityDefinition(SecurityDefinitionState definition, long expectedVersion)
       throws SQLException;
   void appendSecurityAudit(SecurityAuditRecord record) throws SQLException;
