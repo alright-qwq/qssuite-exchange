@@ -53,7 +53,14 @@ public final class Main extends JavaPlugin implements Listener {
       }
     }
     if (!getConfig().getBoolean("enabled", false)) {
-      getLogger().info("QuickShop Exchange is disabled in config.yml");
+      if (new File(getDataFolder(), "config.yml").isFile()
+          && !getConfig().contains("enabled")) {
+        getLogger().severe("config.yml exists but could not be parsed (or is missing the"
+            + " 'enabled' key); the addon is staying disabled. Fix the YAML and run"
+            + " /qse reload to retry without restarting the server.");
+      } else {
+        getLogger().info("QuickShop Exchange is disabled in config.yml");
+      }
       return;
     }
     try {
