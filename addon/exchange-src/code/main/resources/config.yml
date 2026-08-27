@@ -1,0 +1,31 @@
+# Default configuration for the Exchange addon.
+config-version: 2
+enabled: true
+database:
+  # quickshop 复用 QuickShop 的主数据库；sqlite 使用本插件独立数据库文件
+  mode: quickshop
+economy:
+  world: world
+  default-currency: default
+market-data:
+  # GUI 行情自动刷新间隔（毫秒），减少无谓的界面重绘
+  gui-refresh-ms: 1000
+  candle-retention-days: 365
+risk-defaults:
+  price-cage-ratio: '0.20'
+  default-market-slippage: '0.05'
+  maximum-market-slippage: '0.20'
+  level-one-move: '0.10'
+  level-one-halt-seconds: 120
+  level-two-move: '0.20'
+  level-two-halt-seconds: 600
+  operations-per-second: 5
+  operations-per-minute: 60
+operations:
+  # 对账自动执行间隔（分钟），0 表示禁用自动对账
+  reconciliation-interval-minutes: 1440
+  audit-export-directory: audit
+rollout:
+  # 上线初期建议开启白名单；正式开放后设为 false 即可对全部玩家开放
+  whitelist-enabled: true
+  allowed-players: []

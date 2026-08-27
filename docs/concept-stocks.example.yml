@@ -1,0 +1,438 @@
+# ============================================================================
+# 纯概念股市场配置示例（仅虚拟证券，无任何实物物品）
+#
+# 使用方法（全新部署，默认全部开启）：
+#   1. 把下方 markets: 段替换服务器上 qssuite-exchange 数据目录里的
+#      markets.yml 对应内容（或把需要的条目合并进去）。
+#   2. 确认插件 config.yml 里 enabled: true（默认是 false，不开不加载）。
+#   3. 重启服务器。首次启动会自动为每个市场创建数据库行，并直接以
+#      OPEN 状态开放市场与证券（enabled: true），无需逐个 resume。
+#   4. 发行初始供应量，让玩家有股票可卖（每只一条，替换 <玩家UUID>）：
+#        /qse admin stock issue ALPHA <玩家UUID> 5000 首发
+#        /qse admin stock issue BETA <玩家UUID> 2000 首发
+#        /qse admin stock issue GAMMA <玩家UUID> 10000 首发
+#        /qse admin stock issue DELTA <玩家UUID> 3000 首发
+#        /qse admin stock issue EPSLN <玩家UUID> 1000 首发
+#        /qse admin stock issue ZETA <玩家UUID> 25000 首发
+#        /qse admin stock issue ETA <玩家UUID> 750 首发
+#        /qse admin stock issue THETA <玩家UUID> 4000 首发
+#        /qse admin stock issue IOTA <玩家UUID> 50000 首发
+#        /qse admin stock issue KAPPA <玩家UUID> 1250 首发
+#        /qse admin stock issue LAMBDA <玩家UUID> 500 首发
+#        /qse admin stock issue OMEGA <玩家UUID> 250 首发
+#        /qse admin stock issue PIXEL <玩家UUID> 7500 首发
+#        /qse admin stock issue NOVA <玩家UUID> 1750 首发
+#        /qse admin stock issue MOON <玩家UUID> 250000 首发
+#   5. 玩家即可在 /qse stocks 看到全部市场并开始交易。
+#
+# 重要：上线前先检查插件 config.yml 的 rollout 白名单——
+#   rollout:
+#     whitelist-enabled: true        # 保持 true 表示只允许下列玩家
+#     allowed-players:               # 填入玩家 UUID（/qse 提示未在白名单）
+#       - 00000000-0000-0000-0000-000000000000
+#   若服务器没有现成的交易所用户体系，可临时设为 whitelist-enabled: false
+#   再重启，所有玩家即可访问；正式运营建议保留白名单。
+#
+# 注意：若数据库里已存在之前用 enabled: false 创建的 CLOSED 行，改配置
+# 不会改变已有状态，需要先执行一次 /qse admin stock resume <代码> 上线。
+# 规则：min-quantity 必须是 minimum-unit 的整数倍（IOTA/MOON 因最小单位
+# 为 10/100，min-quantity 已对应设为 10/100）。
+#
+# 设计说明：15 只股票覆盖不同"行业"与风险档位——
+#   大盘稳健：ALPHA / DELTA / PIXEL / IOTA / GAMMA
+#   成长中盘：BETA / NOVA / THETA / ZETA / KAPPA
+#   稀缺高价：ETA / LAMBDA / OMEGA / EPSLN
+#   高波动主题：MOON（Meme 币，仅供娱乐）
+# ============================================================================
+config-version: 1
+markets:
+  alpha:
+    enabled: true
+    display-name: 阿尔法控股
+    security:
+      symbol: ALPHA
+      name: Alpha Holdings
+      description: 蓝筹综合集团，资产组合稳健，适合新手配置底仓
+      base-price: '10.00'
+      total-supply: 100000
+      minimum-unit: 1
+    currency: default
+    base-price: '10.00'
+    min-price: '1.00'
+    max-price: '100.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 1000
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 10000
+    max-frozen-currency: '25000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  beta:
+    enabled: true
+    display-name: 贝塔动力
+    security:
+      symbol: BETA
+      name: Beta Dynamics
+      description: 高速成长型制造企业，订单簿波动适中
+      base-price: '25.00'
+      total-supply: 40000
+      minimum-unit: 1
+    currency: default
+    base-price: '25.00'
+    min-price: '2.50'
+    max-price: '250.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 500
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 4000
+    max-frozen-currency: '30000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  gamma:
+    enabled: true
+    display-name: 伽马深矿
+    security:
+      symbol: GAMMA
+      name: Gamma Deep Mining
+      description: 下界与主世界采矿龙头，随矿物周期波动
+      base-price: '8.50'
+      total-supply: 200000
+      minimum-unit: 1
+    currency: default
+    base-price: '8.50'
+    min-price: '0.85'
+    max-price: '85.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 2000
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 20000
+    max-frozen-currency: '40000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  delta:
+    enabled: true
+    display-name: 德尔塔物流
+    security:
+      symbol: DELTA
+      name: Delta Logistics
+      description: 铁路与传送门货运网络，低波动防御型
+      base-price: '15.00'
+      total-supply: 60000
+      minimum-unit: 1
+    currency: default
+    base-price: '15.00'
+    min-price: '1.50'
+    max-price: '150.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 1000
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 6000
+    max-frozen-currency: '30000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  epsln:
+    enabled: true
+    display-name: 艾普西隆能源
+    security:
+      symbol: EPSLN
+      name: Epsilon Energy
+      description: 下界岩浆与烈焰粉能源供应商
+      base-price: '42.00'
+      total-supply: 20000
+      minimum-unit: 1
+    currency: default
+    base-price: '42.00'
+    min-price: '4.20'
+    max-price: '420.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 300
+    discovery-quantity: 50
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 2000
+    max-frozen-currency: '25000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  zeta:
+    enabled: true
+    display-name: 泽塔炼金
+    security:
+      symbol: ZETA
+      name: Zeta Alchemy
+      description: 药水与炼金材料综合平台，成交活跃
+      base-price: '5.20'
+      total-supply: 500000
+      minimum-unit: 1
+    currency: default
+    base-price: '5.20'
+    min-price: '0.52'
+    max-price: '52.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 5000
+    discovery-quantity: 200
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 50000
+    max-frozen-currency: '40000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  eta:
+    enabled: true
+    display-name: 伊塔附魔
+    security:
+      symbol: ETA
+      name: Eta Enchanting
+      description: 高级附魔书与经验服务，稀缺高价位标的
+      base-price: '33.00'
+      total-supply: 15000
+      minimum-unit: 1
+    currency: default
+    base-price: '33.00'
+    min-price: '3.30'
+    max-price: '330.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 250
+    discovery-quantity: 10
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 1500
+    max-frozen-currency: '15000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  theta:
+    enabled: true
+    display-name: 西塔红石
+    security:
+      symbol: THETA
+      name: Theta Redstone
+      description: 红石科技与自动化设备制造商
+      base-price: '12.75'
+      total-supply: 80000
+      minimum-unit: 1
+    currency: default
+    base-price: '12.75'
+    min-price: '1.27'
+    max-price: '127.50'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 1000
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 8000
+    max-frozen-currency: '20000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  iota:
+    enabled: true
+    display-name: 艾奥塔农产
+    security:
+      symbol: IOTA
+      name: Iota Farm & Harvest
+      description: 大规模农业与食品加工，超大盘稳健标的
+      base-price: '3.40'
+      total-supply: 1000000
+      minimum-unit: 10
+    currency: default
+    base-price: '3.40'
+    min-price: '0.34'
+    max-price: '34.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 10
+    max-quantity: 10000
+    discovery-quantity: 1000
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 100000
+    max-frozen-currency: '50000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  kappa:
+    enabled: true
+    display-name: 卡帕酿酒
+    security:
+      symbol: KAPPA
+      name: Kappa Brewing
+      description: 蜂蜜酒与药水酒馆连锁，消费类概念
+      base-price: '18.90'
+      total-supply: 25000
+      minimum-unit: 1
+    currency: default
+    base-price: '18.90'
+    min-price: '1.89'
+    max-price: '189.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 400
+    discovery-quantity: 50
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 2500
+    max-frozen-currency: '15000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  lambda:
+    enabled: true
+    display-name: 兰布达下界工程
+    security:
+      symbol: LAMBDA
+      name: Lambda Netherworks
+      description: 下界合金装备与基建工程
+      base-price: '55.00'
+      total-supply: 10000
+      minimum-unit: 1
+    currency: default
+    base-price: '55.00'
+    min-price: '5.50'
+    max-price: '550.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 200
+    discovery-quantity: 10
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 1000
+    max-frozen-currency: '20000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  omega:
+    enabled: true
+    display-name: 欧米伽末地工业
+    security:
+      symbol: OMEGA
+      name: Omega End Industries
+      description: 末地水晶与鞘翅相关高端制造，稀缺高价
+      base-price: '88.88'
+      total-supply: 5000
+      minimum-unit: 1
+    currency: default
+    base-price: '88.88'
+    min-price: '8.89'
+    max-price: '888.80'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 100
+    discovery-quantity: 10
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 500
+    max-frozen-currency: '15000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  pixel:
+    enabled: true
+    display-name: 像素锻造
+    security:
+      symbol: PIXEL
+      name: Pixel Forge
+      description: 建筑与装饰材料制造商，低波动大盘
+      base-price: '6.66'
+      total-supply: 150000
+      minimum-unit: 1
+    currency: default
+    base-price: '6.66'
+    min-price: '0.67'
+    max-price: '66.60'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 1500
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 15000
+    max-frozen-currency: '15000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  nova:
+    enabled: true
+    display-name: 新星交通
+    security:
+      symbol: NOVA
+      name: Nova Rail & Transit
+      description: 主世界铁路与冰道运输网络
+      base-price: '23.50'
+      total-supply: 35000
+      minimum-unit: 1
+    currency: default
+    base-price: '23.50'
+    min-price: '2.35'
+    max-price: '235.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 500
+    discovery-quantity: 50
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 3500
+    max-frozen-currency: '20000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  moon:
+    enabled: true
+    display-name: 月亮 Meme 币
+    security:
+      symbol: MOON
+      name: Moon Meme Token
+      description: 高波动主题代币，仅供娱乐，注意风险
+      base-price: '0.99'
+      total-supply: 5000000
+      minimum-unit: 100
+    currency: default
+    base-price: '0.99'
+    min-price: '0.10'
+    max-price: '9.90'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 100
+    max-quantity: 50000
+    discovery-quantity: 1000
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 500000
+    max-frozen-currency: '100000.00'
+    max-open-orders: 100
+    block-container-shops: false

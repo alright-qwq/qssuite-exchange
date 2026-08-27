@@ -1,0 +1,50 @@
+config-version: 1
+markets:
+  minecraft_diamond/default:
+    enabled: false
+    display-name: Diamond / Default Currency
+    item:
+      mode: VANILLA_MATERIAL
+      material: DIAMOND
+    currency: default
+    base-price: '100.00'
+    min-price: '1.00'
+    max-price: '10000.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 2304
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 100000
+    max-frozen-currency: '10000000.00'
+    max-open-orders: 100
+    block-container-shops: false
+  concept_alpha:
+    enabled: false
+    display-name: Concept Alpha
+    security:
+      symbol: ALPHA
+      name: Alpha Holdings
+      description: Pure ledger concept stock
+      base-price: '10.00'
+      total-supply: 1000
+      minimum-unit: 1
+    currency: default
+    base-price: '10.00'
+    min-price: '1.00'
+    max-price: '100.00'
+    tick-size: '0.01'
+    price-scale: 2
+    currency-scale: 2
+    min-quantity: 1
+    max-quantity: 1000
+    discovery-quantity: 100
+    maker-fee-rate: '0.001'
+    taker-fee-rate: '0.002'
+    max-account-holding: 100000
+    max-frozen-currency: '10000000.00'
+    max-open-orders: 100
+    block-container-shops: false

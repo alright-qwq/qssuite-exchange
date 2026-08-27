@@ -1,0 +1,452 @@
+en-US:
+  command-description: Open the central item exchange
+  permission-denied: You do not have permission for this exchange action.
+  rollout-not-allowed: This account is not included in the current exchange rollout.
+  command-invalid: The exchange command or its arguments are invalid.
+  command-help: 'Exchange commands:\n/open: market list\n/market <id>: market detail\n/order limit|market <buy|sell> ...: place order\n/cancel <order-id>: cancel order\n/orders: my orders\n/assets: balances and transfers\n/history: account history\n/stock <symbol>: open a concept stock\n/deposit|withdraw money|item ...: deposit or withdraw\n/reload: reload exchange configuration (admin)'
+  market-not-open: This market currently accepts queries and cancellations only.
+  request-accepted: 'Exchange request accepted: <requestId>'
+  request-ready: 'Exchange request ready for confirmation: <requestId>'
+  review-required: This transfer needs administrator review and will not be retried automatically.
+  inventory-full: Your inventory is full; the withdrawal remains ready to claim.
+  admin-command-invalid: The administrator command or its arguments are invalid.
+  admin-command-failed: The administrator request could not be completed.
+  admin-reconciliation-balanced: Exchange reconciliation completed with no differences.
+  admin-reconciliation-difference: Exchange reconciliation found differences; review the server audit logs.
+  admin-audit-exported: 'Exchange audit CSV exported: <0>'
+  admin-audit-status: 'Exchange audit status:\n<0>'
+  admin-audit-acknowledged: Exchange alert acknowledged.
+  reload-requested: Exchange configuration reload requested; the result will appear in the server console.
+  admin-transfer-review-list: 'Transfers awaiting review:\n<0>'
+  admin-transfer-review-detail: 'Transfer review detail: <0>'
+  ui-data-unavailable: Exchange data is currently unavailable.
+  ui-history-trade-title: '<0> trade @ <1>'
+  ui-history-trade-id: 'Trade #<0>'
+  ui-history-trade-buy: 'Buy'
+  ui-history-trade-sell: 'Sell'
+  ui-history-trade-quantity: 'Quantity: <0>'
+  ui-history-trade-notional: 'Value: <0>'
+  ui-history-maker-fee: 'Maker fee: <0>'
+  ui-history-taker-fee: 'Taker fee: <0>'
+  ui-history-trade-total-fee: 'Trade fees: <0>'
+  ui-history-trade-my-fee: 'My fee: <0>'
+  ui-history-created-at: 'Time: <0>'
+  ui-history-transfer-title: 'Transfer: <0>'
+  ui-history-transfer-asset: 'Asset: <0>'
+  ui-history-transfer-amount: 'Amount: <0>'
+  ui-history-transfer-status: 'Status: <0>'
+  ui-history-ledger-title: 'Ledger: <0>'
+  ui-history-ledger-asset: 'Asset: <0>'
+  ui-history-ledger-amount: 'Change: <0>'
+  ui-history-ledger-reference: 'Reference: <0>'
+  ui-market-last: 'Last: <0>'
+  ui-market-bid-ask: 'Bid / Ask: <0> / <1>'
+  ui-market-volume: '24h volume: <0>'
+  ui-market-notional: '24h notional: <0>'
+  ui-market-list-notional: '24h turnover: <0>'
+  ui-market-volatility: '24h volatility: <0>'
+  ui-market-high-low: '24h high / low: <0> / <1>'
+  ui-market-change-percent: '24h change: <0>%'
+  ui-market-last-trade: 'Last trade: <0> <1> × <2>'
+  ui-market-status: 'Status: <0>'
+  ui-market-spread: 'Spread: <0> (<1>)'
+  ui-market-asset-type: 'Asset: <0>'
+  ui-market-symbol: 'Symbol: <0>'
+  ui-market-total-supply: 'Total supply: <0>'
+  ui-market-issued-supply: 'Issued / Total: <0> / <1>'
+  ui-market-float-cap: 'Float market cap: <0>'
+  ui-market-security-status: 'Security status: <0>'
+  ui-market-my-currency: 'Your currency: <0> available / <1> frozen'
+  ui-market-afford-buy: 'At <0> you can buy about <1>'
+  ui-market-afford-sell: 'You can sell about <0>'
+  ui-market-my-items: 'Your holding: <0> available / <1> frozen'
+  ui-market-my-security: 'Your holding: <0> available / <1> frozen'
+  ui-market-my-open-orders: 'Your open orders in this market: <0> / <1>'
+  ui-market-my-open-orders-count: 'Your open orders in this market: <0>'
+  ui-market-trades-24h: '24h trades: <0>'
+  ui-market-trades-buy-sell: '24h buys / sells: <0> / <1>'
+  ui-market-trades-title: '24h trade summary'
+  ui-market-recent-trades: Recent trades
+  ui-market-recent-trade-title: '<0> trade @ <1>'
+  ui-market-recent-trade-id: 'Trade #<0>'
+  ui-market-recent-trade-quantity: 'Quantity: <0>'
+  ui-market-recent-trade-notional: 'Value: <0>'
+  ui-market-recent-trade-time: 'Time: <0>'
+  ui-market-recent-empty: No recent trades.
+  ui-market-recent-active-buy: Active buy
+  ui-market-recent-active-sell: Active sell
+  ui-market-recent-more: View full trade history
+  ui-market-trades-page-title: '<0> trade history'
+  ui-market-back-detail: Back to market
+  ui-market-trades-header-last: 'Last: <0>'
+  ui-market-trades-header-bid-ask: 'Bid / Ask: <0> / <1>'
+  ui-market-trades-header-change: '24h change: <0>%'
+  ui-nav-markets: Markets
+  ui-nav-assets: Assets
+  ui-nav-orders: My orders
+  ui-overview-title: Market overview
+  ui-overview-markets: 'Markets: <0>'
+  ui-overview-breadth: '24h rising / falling: <0> / <1>'
+  ui-overview-volume: '24h total volume: <0>'
+  ui-overview-notional: '24h total notional: <0>'
+  ui-overview-active: 'Most active: <0>'
+  ui-overview-gainer: 'Top gainer: <0>'
+  ui-overview-loser: 'Top loser: <0>'
+  ui-sort-title: 'Sort: <0>'
+  ui-sort-hint: 'Click to switch sorting'
+  ui-sort-current: 'Current: <0>'
+  ui-filter-title: 'Filter: <0>'
+  ui-filter-hint: 'Click to switch asset filter'
+  ui-filter-current: 'Current: <0>'
+  ui-depth-bid: Bid depth
+  ui-depth-ask: Ask depth
+  ui-depth-empty: No depth
+  ui-depth-price: 'Price: <0>'
+  ui-depth-quantity: 'Quantity: <0>'
+  ui-depth-cumulative: 'Cumulative: <0>'
+  ui-depth-notional: 'Value: <0>'
+  ui-depth-distance: 'Distance from last: <0>'
+  ui-depth-executable: Executable now
+  ui-depth-protected: Outside price cage
+  ui-depth-executable-summary: 'Executable depth: <0> bid / <1> ask'
+  ui-trend-title: '1m trade: <0>'
+  ui-trend-up: Up
+  ui-trend-down: Down
+  ui-trend-flat: Flat
+  ui-trend-empty: No recent trade
+  ui-trend-timeframe-1m: 'Chart: 1m candles (9 min)'
+  ui-trend-timeframe-15m: 'Chart: 15m candles (2h15m)'
+  ui-trend-timeframe-1h: 'Chart: 1h candles (9h)'
+  ui-trend-timeframe-4h: 'Chart: 4h candles (36h)'
+  ui-trend-time: 'Bucket: <0>'
+  ui-trend-open: 'Open: <0>'
+  ui-trend-high: 'High: <0>'
+  ui-trend-low: 'Low: <0>'
+  ui-trend-close: 'Close: <0>'
+  ui-trend-change: 'Change: <0> (<1>%)'
+  ui-trend-volume: 'Volume: <0>'
+  ui-assets-available: 'Available: <0>'
+  ui-assets-frozen: 'Frozen: <0>'
+  ui-assets-virtual-security: Virtual security (ledger-only, cannot deposit or withdraw)
+  ui-assets-open-market: 'Click to open the market'
+  ui-assets-symbol: 'Symbol: <0>'
+  ui-assets-market-value: 'Estimated value: <0>'
+  ui-assets-total-value: Total portfolio value
+  ui-assets-total-value-amount: 'Estimated total: <0>'
+  ui-assets-total-value-frozen: 'Frozen total: <0>'
+  ui-assets-deposit-action: 'Left click: deposit'
+  ui-assets-withdraw-action: 'Right click: withdraw'
+  ui-assets-transfer-title: 'Transfer <0>'
+  ui-assets-transfer-kind: '<0> <1>'
+  ui-assets-transfer-amount: 'Amount: <0>'
+  ui-assets-transfer-status: 'Status: <0>'
+  ui-assets-transfers-empty: No recent transfers
+  ui-assets-transfers-page: 'Transfers page <0>'
+  ui-assets-more-currency: '+<0> more currency assets in the history page'
+  ui-assets-more-securities: '+<0> more virtual securities in the market list'
+  ui-transfer-money-prompt: Enter a positive money amount in chat.
+  ui-transfer-item-prompt: Enter a positive whole item quantity in chat.
+  ui-transfer-money-invalid: Enter a positive money amount.
+  ui-transfer-item-invalid: Enter a positive whole item quantity.
+  ui-order-title: '<0> <1>'
+  ui-order-status: 'Status: <0>'
+  ui-order-remaining: 'Remaining: <0>/<1>'
+  ui-order-price: 'Price / protection: <0>'
+  ui-order-frozen-currency: 'Frozen funds: <0>'
+  ui-order-frozen-quantity: 'Frozen quantity: <0>'
+  ui-order-current-price: 'Last: <0>'
+  ui-order-price-distance: 'Last vs order: <0>'
+  ui-order-time: 'Placed: <0>'
+  ui-market-not-selected: No market is selected.
+  ui-market-bid: 'Best bid: <0>'
+  ui-market-ask: 'Best ask: <0>'
+  ui-market-change: '24h change: <0>'
+  ui-order-limit-buy: Limit buy
+  ui-order-limit-sell: Limit sell
+  ui-order-market-buy: Market buy
+  ui-order-market-sell: Market sell
+  ui-order-limit-format: 'Chat format: quantity price'
+  ui-order-limit-example: 'Example: 2 100.00'
+  ui-order-virtual-hint: 'Virtual security: settles as ledger balance, not an item'
+  ui-order-market-format: 'Chat format: quantity protection price (worst acceptable)'
+  ui-order-market-fixed-boundary: 'Buy: max you pay. Sell: min you receive. Fixed after confirmation.'
+  ui-order-limit-prompt: 'Enter quantity and limit price in chat, for example: 2 100.00'
+  ui-order-limit-prompt-hint: 'Best ask/bid is <0> for <1>. Enter quantity and limit price in chat, for example: 2 <0>'
+  ui-order-market-prompt: 'Enter quantity and protection price (worst acceptable), e.g. buy 2 105.00 / sell 2 95.00'
+  ui-order-market-prompt-hint: 'Best ask/bid is <0> for <1>. Enter quantity and protection price (worst acceptable), e.g. 2 <0>'
+  ui-order-limit-invalid: 'Enter quantity and a positive limit price, for example: 2 100.00'
+  ui-order-market-invalid: 'Enter quantity and a positive absolute protection boundary, for example: 2 105.00'
+  ui-history-previous: Previous page
+  ui-history-next: Next page
+  ui-history-page: 'History page <0>'
+  ui-history-empty: No history entries.
+  ui-orders-empty: No open orders.
+  ui-confirm-not-selected: No exchange request is selected.
+  ui-confirm-order-title: 'Confirm <0> order'
+  ui-confirm-transfer-title: 'Confirm <0> transfer'
+  ui-confirm-cancel-title: Confirm order cancellation
+  ui-confirm-title: Confirm exchange request
+  ui-confirm-action: Confirm and submit
+  ui-confirm-request: 'Request: <0>'
+  ui-confirm-market: 'Market: <0>'
+  ui-confirm-side: 'Side: <0>'
+  ui-confirm-quantity: 'Quantity: <0>'
+  ui-confirm-quantity-limit: 'Quantity range: <0> - <1>'
+  ui-confirm-price-limit: 'Price range: <0> - <1>'
+  ui-confirm-tick-size: 'Tick size: <0>'
+  ui-confirm-price: 'Price: <0>'
+  ui-confirm-protection: 'Protection boundary: <0>'
+  ui-confirm-current-quote: 'Current quote: <0>'
+  ui-confirm-limit-immediate: 'This limit order will match immediately'
+  ui-confirm-limit-resting: 'This limit order will rest on the book'
+  ui-confirm-asset: 'Asset: <0>'
+  ui-confirm-amount: 'Amount: <0>'
+  ui-confirm-estimated-notional: 'Estimated total: <0>'
+  ui-confirm-frozen-estimate: 'Funds frozen on submit: <0> (includes worst-case fees)'
+  ui-confirm-fee-rate: 'Fee rate: <0>%'
+  ui-confirm-estimated-fee: 'Estimated fee: <0>'
+  ui-confirm-estimated-net: 'Estimated net received: <0>'
+  ui-confirm-order: 'Order: <0>'
+  ui-confirm-cancel-loading: Loading order details...
+  ui-confirm-cancel-gone: This order is no longer cancellable (filled or already cancelled).
+  ui-confirm-cancel-release-currency: 'Frozen currency released on cancel: <0>'
+  ui-confirm-cancel-release-quantity: 'Frozen quantity released on cancel: <0>'
+  ui-confirm-submit-failed: Exchange request submission failed. Please try again later.
+  ui-confirm-submit-result: 'Exchange <0>: <1>'
+  ui-confirm-back-market: Back to market
+  ui-admin-market: Market controls
+  ui-admin-market-usage: '/qse admin market pause <market> <reason>'
+  ui-admin-orders: Order controls
+  ui-admin-orders-usage: '/qse admin order cancel <order-id> <reason>'
+  ui-admin-recovery: Recovery controls
+  ui-admin-recovery-usage: '/qse admin transfer review list|show|resolve'
+  ui-admin-audit: Audit controls
+  ui-admin-audit-usage: '/qse admin audit status|ack <alertId>|reconcile|export <from> <to>'
+  ui-admin-stock: Stock controls
+  ui-admin-stock-usage: '/qse admin stock create|issue|transfer|pause|resume|close'
+zh-CN:
+  command-description: '打开中央物品交易所'
+  permission-denied: '你没有执行此交易所操作的权限。'
+  rollout-not-allowed: '你的账号尚未加入当前交易所灰度名单。'
+  command-invalid: '交易所命令或参数无效。'
+  command-help: '交易所命令：\n/open：市场列表\n/market <市场ID>：市场详情\n/order limit|market <买入|卖出> ...：下单\n/cancel <订单ID>：撤单\n/orders：我的订单\n/assets：资产与转账\n/history：账户历史\n/stock <代码>：打开概念股\n/deposit|withdraw money|item ...：存入或取出\n/reload：重载交易所配置（管理员）'
+  market-not-open: '当前市场只允许查询和撤单。'
+  request-accepted: '交易请求已受理：<requestId>'
+  request-ready: '交易请求已准备，等待确认：<requestId>'
+  review-required: '此转账需要管理员审核，系统不会自动重试。'
+  inventory-full: '背包空间不足，提现将保留为待领取。'
+  admin-command-invalid: '管理员命令或参数无效。'
+  admin-command-failed: '管理员请求未能完成。'
+  admin-reconciliation-balanced: '交易所对账完成，未发现差异。'
+  admin-reconciliation-difference: '交易所对账发现差异，请检查服务器审计日志。'
+  admin-audit-exported: '交易所审计 CSV 已导出：<0>'
+  admin-audit-status: '交易所审计状态：\n<0>'
+  admin-audit-acknowledged: '交易所告警已确认。'
+  reload-requested: '已请求重载交易所配置，结果请查看服务器控制台。'
+  admin-transfer-review-list: '等待审核的转账：\n<0>'
+  admin-transfer-review-detail: '转账审核详情：<0>'
+  ui-data-unavailable: '交易所数据暂时不可用。'
+  ui-history-trade-title: '<0> 成交 @ <1>'
+  ui-history-trade-id: '成交序号 #<0>'
+  ui-history-trade-buy: 买入
+  ui-history-trade-sell: 卖出
+  ui-history-trade-quantity: '数量：<0>'
+  ui-history-trade-notional: '金额：<0>'
+  ui-history-maker-fee: 'Maker 手续费：<0>'
+  ui-history-taker-fee: 'Taker 手续费：<0>'
+  ui-history-trade-total-fee: '该笔交易手续费：<0>'
+  ui-history-trade-my-fee: '我的手续费：<0>'
+  ui-history-created-at: '时间：<0>'
+  ui-history-transfer-title: '转账：<0>'
+  ui-history-transfer-asset: '资产：<0>'
+  ui-history-transfer-amount: '数量：<0>'
+  ui-history-transfer-status: '状态：<0>'
+  ui-history-ledger-title: '账本：<0>'
+  ui-history-ledger-asset: '资产：<0>'
+  ui-history-ledger-amount: '变动：<0>'
+  ui-history-ledger-reference: '关联请求：<0>'
+  ui-market-last: '最新价：<0>'
+  ui-market-bid-ask: '买一 / 卖一：<0> / <1>'
+  ui-market-volume: '24 小时成交量：<0>'
+  ui-market-notional: '24 小时成交额：<0>'
+  ui-market-list-notional: '24 小时成交额：<0>'
+  ui-market-volatility: '24 小时波动：<0>'
+  ui-market-high-low: '24 小时最高 / 最低：<0> / <1>'
+  ui-market-change-percent: '24 小时涨跌：<0>%'
+  ui-market-last-trade: '最近成交：<0> <1> × <2>'
+  ui-market-status: '状态：<0>'
+  ui-market-spread: '价差：<0>（<1>）'
+  ui-market-asset-type: '资产类型：<0>'
+  ui-market-symbol: '代码：<0>'
+  ui-market-total-supply: '总发行量：<0>'
+  ui-market-issued-supply: '已发行 / 总供给：<0> / <1>'
+  ui-market-float-cap: '流通市值：<0>'
+  ui-market-security-status: '证券状态：<0>'
+  ui-market-my-currency: '你的货币：可用 <0> / 冻结 <1>'
+  ui-market-afford-buy: '按 <0> 价格最多可买入约 <1>'
+  ui-market-afford-sell: '你可卖出约 <0>'
+  ui-market-my-items: '你的持仓：可用 <0> / 冻结 <1>'
+  ui-market-my-security: '你的持仓：可用 <0> / 冻结 <1>'
+  ui-market-my-open-orders: '你在该市场的挂单：<0> / <1>'
+  ui-market-my-open-orders-count: '你在该市场的挂单：<0>'
+  ui-market-trades-24h: '24 小时成交笔数：<0>'
+  ui-market-trades-buy-sell: '24 小时主动买 / 主动卖：<0> / <1>'
+  ui-market-trades-title: 24 小时成交统计
+  ui-market-recent-trades: 最近成交
+  ui-market-recent-trade-title: '<0> 成交 @ <1>'
+  ui-market-recent-trade-id: '成交序号 #<0>'
+  ui-market-recent-trade-quantity: '数量：<0>'
+  ui-market-recent-trade-notional: '金额：<0>'
+  ui-market-recent-trade-time: '时间：<0>'
+  ui-market-recent-empty: 暂无最近成交。
+  ui-market-recent-active-buy: 主动买入
+  ui-market-recent-active-sell: 主动卖出
+  ui-market-recent-more: 查看完整成交历史
+  ui-market-trades-page-title: '<0> 成交历史'
+  ui-market-back-detail: 返回市场
+  ui-market-trades-header-last: '最新价：<0>'
+  ui-market-trades-header-bid-ask: '买一 / 卖一：<0> / <1>'
+  ui-market-trades-header-change: '24 小时涨跌：<0>%'
+  ui-nav-markets: 市场列表
+  ui-nav-assets: 我的资产
+  ui-nav-orders: 我的订单
+  ui-overview-title: 全服大盘
+  ui-overview-markets: '市场数：<0>'
+  ui-overview-breadth: '24 小时上涨 / 下跌：<0> / <1>'
+  ui-overview-volume: '24 小时总成交量：<0>'
+  ui-overview-notional: '24 小时总成交额：<0>'
+  ui-overview-active: '最活跃：<0>'
+  ui-overview-gainer: '涨幅第一：<0>'
+  ui-overview-loser: '跌幅第一：<0>'
+  ui-sort-title: '排序：<0>'
+  ui-sort-hint: '点击切换排序方式'
+  ui-sort-current: '当前：<0>'
+  ui-filter-title: '筛选：<0>'
+  ui-filter-hint: '点击切换资产类型筛选'
+  ui-filter-current: '当前：<0>'
+  ui-depth-bid: 买盘深度
+  ui-depth-ask: 卖盘深度
+  ui-depth-empty: 暂无深度
+  ui-depth-price: '价格：<0>'
+  ui-depth-quantity: '数量：<0>'
+  ui-depth-cumulative: '累计：<0>'
+  ui-depth-notional: '金额：<0>'
+  ui-depth-distance: '距最新价：<0>'
+  ui-depth-executable: 当前可成交
+  ui-depth-protected: 当前超出价格笼子
+  ui-depth-executable-summary: '可立即成交深度：买 <0> / 卖 <1>'
+  ui-trend-title: '1 分钟成交：<0>'
+  ui-trend-up: 上涨
+  ui-trend-down: 下跌
+  ui-trend-flat: 平盘
+  ui-trend-empty: 暂无最近成交
+  ui-trend-timeframe-1m: '图表：1 分钟 K 线（9 分钟）'
+  ui-trend-timeframe-15m: '图表：15 分钟 K 线（2 小时 15 分）'
+  ui-trend-timeframe-1h: '图表：1 小时 K 线（9 小时）'
+  ui-trend-timeframe-4h: '图表：4 小时 K 线（36 小时）'
+  ui-trend-time: '时间桶：<0>'
+  ui-trend-open: '开盘：<0>'
+  ui-trend-high: '最高：<0>'
+  ui-trend-low: '最低：<0>'
+  ui-trend-close: '收盘：<0>'
+  ui-trend-change: '涨跌：<0>（<1>%）'
+  ui-trend-volume: '成交量：<0>'
+  ui-assets-available: '可用：<0>'
+  ui-assets-frozen: '冻结：<0>'
+  ui-assets-virtual-security: '虚拟证券（纯账本，不可充值/提现）'
+  ui-assets-open-market: '点击打开市场'
+  ui-assets-symbol: '代码：<0>'
+  ui-assets-market-value: '预估市值：<0>'
+  ui-assets-total-value: 总资产估值
+  ui-assets-total-value-amount: '预计总资产：<0>'
+  ui-assets-total-value-frozen: '冻结总额：<0>'
+  ui-assets-deposit-action: '左键：充值'
+  ui-assets-withdraw-action: '右键：提现'
+  ui-assets-transfer-title: '转账 <0>'
+  ui-assets-transfer-kind: '<0> <1>'
+  ui-assets-transfer-amount: '数量：<0>'
+  ui-assets-transfer-status: '状态：<0>'
+  ui-assets-transfers-empty: 暂无转账记录
+  ui-assets-transfers-page: '转账第 <0> 页'
+  ui-assets-more-currency: '另有 <0> 项货币资产，请在历史页面查看'
+  ui-assets-more-securities: '另有 <0> 项虚拟证券，请在市场列表查看'
+  ui-transfer-money-prompt: '请在聊天栏输入正数金额。'
+  ui-transfer-item-prompt: '请在聊天栏输入正整数物品数量。'
+  ui-transfer-money-invalid: '请输入正数金额。'
+  ui-transfer-item-invalid: '请输入正整数物品数量。'
+  ui-order-title: '<0> <1>'
+  ui-order-status: '状态：<0>'
+  ui-order-remaining: '剩余：<0>/<1>'
+  ui-order-price: '价格 / 保护边界：<0>'
+  ui-order-frozen-currency: '冻结资金：<0>'
+  ui-order-frozen-quantity: '冻结数量：<0>'
+  ui-order-current-price: '最新价：<0>'
+  ui-order-price-distance: '最新价距订单价：<0>'
+  ui-order-time: '下单时间：<0>'
+  ui-market-not-selected: '尚未选择市场。'
+  ui-market-bid: '最佳买价：<0>'
+  ui-market-ask: '最佳卖价：<0>'
+  ui-market-change: '24 小时涨跌：<0>'
+  ui-order-limit-buy: '限价买入'
+  ui-order-limit-sell: '限价卖出'
+  ui-order-market-buy: '市价买入'
+  ui-order-market-sell: '市价卖出'
+  ui-order-limit-format: '聊天格式：数量 价格'
+  ui-order-limit-example: '示例：2 100.00'
+  ui-order-virtual-hint: '虚拟证券：成交后为账本余额，不产生物品'
+  ui-order-market-format: '聊天格式：数量 保护价（最差可接受价）'
+  ui-order-market-fixed-boundary: '买入：最高支付价；卖出：最低接收价。确认后固定不变。'
+  ui-order-limit-prompt: '请在聊天栏输入数量和限价，例如：2 100.00'
+  ui-order-limit-prompt-hint: '当前最佳买一/卖一为 <0>（<1>）。请在聊天栏输入数量和限价，例如：2 <0>'
+  ui-order-market-prompt: '请在聊天栏输入数量和保护价（最差可接受价），例如买入 2 105.00 / 卖出 2 95.00'
+  ui-order-market-prompt-hint: '当前最佳买一/卖一为 <0>（<1>）。请输入数量和保护价（最差可接受价），例如：2 <0>'
+  ui-order-limit-invalid: '请输入数量和正数限价，例如：2 100.00'
+  ui-order-market-invalid: '请输入数量和正数绝对保护边界，例如：2 105.00'
+  ui-history-previous: '上一页'
+  ui-history-next: '下一页'
+  ui-history-page: '历史第 <0> 页'
+  ui-history-empty: '暂无历史记录。'
+  ui-orders-empty: '暂无挂单。'
+  ui-confirm-not-selected: '尚未选择需要确认的交易请求。'
+  ui-confirm-order-title: '确认 <0> 订单'
+  ui-confirm-transfer-title: '确认 <0> 转账'
+  ui-confirm-cancel-title: '确认撤销订单'
+  ui-confirm-title: '确认交易请求'
+  ui-confirm-action: '确认并提交'
+  ui-confirm-request: '请求：<0>'
+  ui-confirm-market: '市场：<0>'
+  ui-confirm-side: '方向：<0>'
+  ui-confirm-quantity: '数量：<0>'
+  ui-confirm-quantity-limit: '数量范围：<0> - <1>'
+  ui-confirm-price-limit: '价格范围：<0> - <1>'
+  ui-confirm-tick-size: '价格步长：<0>'
+  ui-confirm-price: '价格：<0>'
+  ui-confirm-protection: '保护边界：<0>'
+  ui-confirm-current-quote: '当前盘口参考价：<0>'
+  ui-confirm-limit-immediate: '该限价单将立即成交'
+  ui-confirm-limit-resting: '该限价单将挂在盘口等待成交'
+  ui-confirm-asset: '资产：<0>'
+  ui-confirm-amount: '金额：<0>'
+  ui-confirm-estimated-notional: '预计总额：<0>'
+  ui-confirm-frozen-estimate: '提交后冻结资金：<0>（含最坏情况手续费）'
+  ui-confirm-fee-rate: '手续费率：<0>%'
+  ui-confirm-estimated-fee: '预估手续费：<0>'
+  ui-confirm-estimated-net: '预估到手：<0>'
+  ui-confirm-order: '订单：<0>'
+  ui-confirm-cancel-loading: 正在加载订单详情...
+  ui-confirm-cancel-gone: 该订单已不可撤销（可能已成交或已撤单）。
+  ui-confirm-cancel-release-currency: '撤销后释放冻结资金：<0>'
+  ui-confirm-cancel-release-quantity: '撤销后释放冻结数量：<0>'
+  ui-confirm-submit-failed: '交易请求提交失败，请稍后重试。'
+  ui-confirm-submit-result: '交易所请求 <0>：<1>'
+  ui-confirm-back-market: 返回市场
+  ui-admin-market: 市场控制
+  ui-admin-market-usage: '/qse admin market pause <市场> <原因>'
+  ui-admin-orders: 订单控制
+  ui-admin-orders-usage: '/qse admin order cancel <订单ID> <原因>'
+  ui-admin-recovery: 恢复控制
+  ui-admin-recovery-usage: '/qse admin transfer review list|show|resolve'
+  ui-admin-audit: 审计控制
+  ui-admin-audit-usage: '/qse admin audit status|ack <告警ID>|reconcile|export <起> <止>'
+  ui-admin-stock: 证券控制
+  ui-admin-stock-usage: '/qse admin stock create|issue|transfer|pause|resume|close'

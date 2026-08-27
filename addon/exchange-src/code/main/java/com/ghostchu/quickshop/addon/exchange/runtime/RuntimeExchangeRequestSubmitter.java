@@ -1,0 +1,120 @@
+package com.ghostchu.quickshop.addon.exchange.runtime;
+
+import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
+import com.ghostchu.quickshop.addon.exchange.service.OrderReceipt;
+import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
+import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferStatus;
+import com.ghostchu.quickshop.addon.exchange.ui.ExchangeRequestSubmitter;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/** Submits GUI-held requests through the runtime's writer fence. */
+public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSubmitter, AutoCloseable {
+  private final ExchangeRuntime runtime;
+  private final Executor executor;
+  private final AutoCloseable executorOwner;
+  private final AtomicBoolean closed = new AtomicBoolean();
+
+  public RuntimeExchangeRequestSubmitter(ExchangeRuntime runtime) {
+    this(runtime, new DrainingExecutor("qs-exchange-submit-", java.time.Duration.ofSeconds(30)), true);
+  }
+
+  RuntimeExchangeRequestSubmitter(ExchangeRuntime runtime, Executor executor) {
+    this(runtime, executor, false);
+  }
+
+  private RuntimeExchangeRequestSubmitter(ExchangeRuntime runtime, Executor executor,
+                                          boolean ownsExecutor) {
+    this.runtime = Objects.requireNonNull(runtime, "runtime");
+    this.executor = Objects.requireNonNull(executor, "executor");
+    this.executorOwner = ownsExecutor ? (AutoCloseable) executor : () -> {};
+  }
+
+  @Override
+  public CompletableFuture<SubmissionResult> submit(ExchangeMenuRequest request) {
+    Objects.requireNonNull(request, "request");
+    if (closed.get()) {
+      throw new IllegalStateException("exchange request submitter is closed");
+    }
+    if (request.requestId() == null) {
+      return CompletableFuture.failedFuture(
+          new IllegalArgumentException("request is not confirmable"));
+    }
+    if (request.order() != null) {
+      return CompletableFuture.supplyAsync(() -> order(request), executor);
+    }
+    if (request.orderId() != null) {
+      return CompletableFuture.supplyAsync(() -> cancel(request), executor);
+    }
+    if (request.transfer() != null) {
+      return transfer(request);
+    }
+    return CompletableFuture.completedFuture(new SubmissionResult(
+        request.requestId(), Outcome.REJECTED, "request is not confirmable"));
+  }
+
+  private SubmissionResult order(ExchangeMenuRequest request) {
+    try {
+      Optional<OrderReceipt> receipt = runtime.callWhileWriting(
+          () -> runtime.actions().submitOrder(request.order()));
+      if (receipt.isEmpty()) return unavailable(request);
+      Outcome outcome = "REJECTED".equals(receipt.orElseThrow().status())
+          ? Outcome.REJECTED : Outcome.ACCEPTED;
+      return new SubmissionResult(request.requestId(), outcome, receipt.orElseThrow().orderId().toString());
+    } catch (Exception failure) {
+      return new SubmissionResult(request.requestId(), Outcome.FAILED, failure.getClass().getSimpleName());
+    }
+  }
+
+  private SubmissionResult cancel(ExchangeMenuRequest request) {
+    try {
+      Optional<OrderReceipt> receipt = runtime.callWhileWriting(
+          () -> runtime.actions().cancel(request.accountId(), request.requestId(), request.orderId()));
+      if (receipt.isEmpty()) return unavailable(request);
+      return new SubmissionResult(request.requestId(), Outcome.ACCEPTED,
+          receipt.orElseThrow().orderId().toString());
+    } catch (Exception failure) {
+      return new SubmissionResult(request.requestId(), Outcome.FAILED, failure.getClass().getSimpleName());
+    }
+  }
+
+  private CompletableFuture<SubmissionResult> transfer(ExchangeMenuRequest request) {
+    return runtime.callAsyncWhileWriting(
+        () -> runtime.actions().submitTransfer(request.transfer()), executor)
+        .handle((completed, failure) -> {
+          if (failure != null) {
+            return new SubmissionResult(request.requestId(), Outcome.FAILED,
+                failure.getClass().getSimpleName());
+          }
+          if (completed.isEmpty()) {
+            return unavailable(request);
+          }
+          TransferRecord transfer = completed.orElseThrow();
+          Outcome outcome = transfer.status() == TransferStatus.REVIEW_REQUIRED
+              ? Outcome.REVIEW_REQUIRED : transfer.status() == TransferStatus.FAILED
+              ? Outcome.REJECTED : Outcome.ACCEPTED;
+          return new SubmissionResult(request.requestId(), outcome, transfer.transferId().toString());
+        });
+  }
+
+  private static SubmissionResult unavailable(ExchangeMenuRequest request) {
+    return new SubmissionResult(request.requestId(), Outcome.REJECTED, "writer unavailable");
+  }
+
+  @Override
+  public void close() {
+    if (!closed.compareAndSet(false, true)) {
+      return;
+    }
+    try {
+      executorOwner.close();
+    } catch (RuntimeException failure) {
+      throw failure;
+    } catch (Exception failure) {
+      throw new IllegalStateException("failed to close exchange request submitter", failure);
+    }
+  }
+}

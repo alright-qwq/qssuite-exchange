@@ -1,0 +1,37 @@
+name: qssuite-exchange
+version: '${project.version}'
+main: com.ghostchu.quickshop.addon.${project.artifactId}.Main
+folia-supported: true
+api-version: '1.20'
+depend:
+  - QuickShop-Hikari
+authors: [ Ghost_chu ]
+commands:
+  qse:
+    description: Open QuickShop Exchange
+    usage: /qse
+permissions:
+  quickshop.exchange.use:
+    default: true
+  quickshop.exchange.deposit:
+    default: true
+  quickshop.exchange.withdraw:
+    default: true
+  quickshop.exchange.order.cancel:
+    default: true
+  quickshop.exchange.order.limit:
+    default: true
+  quickshop.exchange.order.market:
+    default: true
+  quickshop.exchange.admin.market:
+    default: op
+  quickshop.exchange.admin.orders:
+    default: op
+  quickshop.exchange.admin.recovery:
+    default: op
+  quickshop.exchange.admin.audit:
+    default: op
+  quickshop.exchange.admin.stock:
+    default: op
+  quickshop.exchange.admin.reload:
+    default: op
