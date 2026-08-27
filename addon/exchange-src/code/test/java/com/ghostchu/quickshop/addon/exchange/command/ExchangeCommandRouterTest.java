@@ -124,6 +124,16 @@ class ExchangeCommandRouterTest {
   }
 
   @Test
+  void tabCompletionContainsCandidateSourceErrors() {
+    ExchangeCommandRouter router = new ExchangeCommandRouter(
+        UUID::randomUUID, null, RolloutPolicy.DISABLED, Function.identity(),
+        () -> { throw new LinkageError("shaded candidate source conflict"); });
+
+    assertThat(router.tabComplete(new Actor("quickshop.exchange.use"),
+        new String[] {"stock", "al"})).isEmpty();
+  }
+
+  @Test
   void rejectsUnknownCommandWithoutOpeningAUserControlledMenu() {
     Actor actor = new Actor("quickshop.exchange.use");
     new ExchangeCommandRouter(UUID::randomUUID).execute(actor,

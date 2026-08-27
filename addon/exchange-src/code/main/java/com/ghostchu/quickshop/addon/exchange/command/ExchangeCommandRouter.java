@@ -327,37 +327,45 @@ public final class ExchangeCommandRouter {
   /** Returns only known subcommands and argument choices. */
   public List<String> tabComplete(CommandActor actor, String[] args) {
     Objects.requireNonNull(actor, "actor");
-    if (args == null || args.length == 0) {
-      return List.of("open", "market", "order", "cancel", "deposit", "withdraw", "orders",
-          "assets", "history", "stocks", "stock", "admin", "reload", "help");
+    try {
+      if (args == null || args.length == 0) {
+        return List.of("open", "market", "order", "cancel", "deposit", "withdraw", "orders",
+            "assets", "history", "stocks", "stock", "admin", "reload", "help");
+      }
+      if (args.length == 1) {
+        String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
+        return List.of("open", "market", "order", "cancel", "deposit", "withdraw", "orders",
+            "assets", "history", "stocks", "stock", "admin", "reload", "help").stream()
+            .filter(value -> value.startsWith(prefix)).toList();
+      }
+      return switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
+        case "order" -> args.length == 2 ? List.of("limit", "market")
+            : args.length == 3 ? List.of("buy", "sell") : List.of();
+        case "stock" -> args.length == 2 ? prefixMatches(symbolCandidates.get(), args[1]) : List.of();
+        case "deposit", "withdraw" -> args.length == 2 ? List.of("money", "item") : List.of();
+        case "admin" -> args.length == 2 ? List.of("market", "order", "transfer", "audit", "stock")
+            : args.length == 3 && "audit".equalsIgnoreCase(args[1])
+                ? List.of("status", "ack", "reconcile", "export")
+            : args.length == 4 && "audit".equalsIgnoreCase(args[1])
+                && "ack".equalsIgnoreCase(args[2]) ? List.of("<alertId>")
+            : args.length == 3 && "stock".equalsIgnoreCase(args[1])
+                ? List.of("create", "issue", "transfer", "pause", "resume", "close")
+            : args.length >= 4 && "stock".equalsIgnoreCase(args[1])
+                && !"create".equalsIgnoreCase(args[2])
+                ? prefixMatches(symbolCandidates.get(), args[3])
+            : args.length == 3 && "transfer".equalsIgnoreCase(args[1]) ? List.of("review")
+            : args.length == 4 && "transfer".equalsIgnoreCase(args[1])
+                && "review".equalsIgnoreCase(args[2]) ? List.of("list", "show", "resolve")
+            : List.of();
+        default -> List.of();
+      };
+    } catch (Throwable failure) {
+      // Tab completion must never take down the command pipeline; a failing candidate source
+      // simply yields no suggestions this time.
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "Exchange tab completion failed for account " + actor.accountId(), failure);
+      return List.of();
     }
-    if (args.length == 1) {
-      String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
-      return List.of("open", "market", "order", "cancel", "deposit", "withdraw", "orders",
-          "assets", "history", "stocks", "stock", "admin", "reload", "help").stream()
-          .filter(value -> value.startsWith(prefix)).toList();
-    }
-    return switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
-      case "order" -> args.length == 2 ? List.of("limit", "market")
-          : args.length == 3 ? List.of("buy", "sell") : List.of();
-      case "stock" -> args.length == 2 ? prefixMatches(symbolCandidates.get(), args[1]) : List.of();
-      case "deposit", "withdraw" -> args.length == 2 ? List.of("money", "item") : List.of();
-      case "admin" -> args.length == 2 ? List.of("market", "order", "transfer", "audit", "stock")
-          : args.length == 3 && "audit".equalsIgnoreCase(args[1])
-              ? List.of("status", "ack", "reconcile", "export")
-          : args.length == 4 && "audit".equalsIgnoreCase(args[1])
-              && "ack".equalsIgnoreCase(args[2]) ? List.of("<alertId>")
-          : args.length == 3 && "stock".equalsIgnoreCase(args[1])
-              ? List.of("create", "issue", "transfer", "pause", "resume", "close")
-          : args.length >= 4 && "stock".equalsIgnoreCase(args[1])
-              && !"create".equalsIgnoreCase(args[2])
-              ? prefixMatches(symbolCandidates.get(), args[3])
-          : args.length == 3 && "transfer".equalsIgnoreCase(args[1]) ? List.of("review")
-          : args.length == 4 && "transfer".equalsIgnoreCase(args[1])
-              && "review".equalsIgnoreCase(args[2]) ? List.of("list", "show", "resolve")
-          : List.of();
-      default -> List.of();
-    };
   }
 
   private static List<String> prefixMatches(List<String> values, String prefix) {
