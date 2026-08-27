@@ -215,6 +215,7 @@ class MarketRegistryTest {
 
     assertThatThrownBy(() -> MarketRegistry.load(config.toFile(), markets.toFile()))
         .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("market 'concept_alpha' is invalid")
         .hasMessageContaining("minimum quantity must align with security unit");
   }
 

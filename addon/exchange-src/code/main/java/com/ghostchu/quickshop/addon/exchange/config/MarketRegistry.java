@@ -42,32 +42,37 @@ public final class MarketRegistry {
     ConfigurationSection configuredMarkets = requiredSection(markets, "markets");
     Map<String, MarketDefinition> definitions = new LinkedHashMap<>();
     for (String marketId : configuredMarkets.getKeys(false)) {
-      ConfigurationSection market = requiredSection(configuredMarkets, marketId);
-      ConfigurationSection item = market.getConfigurationSection("item");
-      ConfigurationSection security = market.getConfigurationSection("security");
-      if (security == null && item == null) {
-        throw new IllegalArgumentException("missing configuration section: item");
+      try {
+        ConfigurationSection market = requiredSection(configuredMarkets, marketId);
+        ConfigurationSection item = market.getConfigurationSection("item");
+        ConfigurationSection security = market.getConfigurationSection("security");
+        if (security == null && item == null) {
+          throw new IllegalArgumentException("missing configuration section: item");
+        }
+        if (security != null && item != null) {
+          throw new IllegalArgumentException("virtual security market must not define an item");
+        }
+        MarketDefinition.ItemDefinition itemDefinition = null;
+        if (item != null) {
+          itemDefinition = new MarketDefinition.ItemDefinition(
+              FingerprintMode.valueOf(requiredString(item, "mode")),
+              requiredString(item, "material"), item.getString("encoded-template"),
+              item.getString("fingerprint"));
+        }
+        definitions.put(marketId, new MarketDefinition(marketId,
+            requiredString(market, "display-name"), market.getBoolean("enabled"),
+            itemDefinition, structuralRules(market), riskRules(market, riskDefaults),
+            market.getBoolean("block-container-shops"),
+            security == null ? AssetType.PHYSICAL_ITEM : AssetType.VIRTUAL_SECURITY,
+            security == null ? null : new SecurityDefinition(
+                requiredString(security, "symbol"), requiredString(security, "name"),
+                requiredString(security, "description"), requiredString(market, "currency"),
+                decimal(security, "base-price"), security.getLong("total-supply"),
+                security.getLong("minimum-unit"))));
+      } catch (RuntimeException failure) {
+        throw new IllegalArgumentException(
+            "market '" + marketId + "' is invalid: " + failure.getMessage(), failure);
       }
-      if (security != null && item != null) {
-        throw new IllegalArgumentException("virtual security market must not define an item");
-      }
-      MarketDefinition.ItemDefinition itemDefinition = null;
-      if (item != null) {
-        itemDefinition = new MarketDefinition.ItemDefinition(
-            FingerprintMode.valueOf(requiredString(item, "mode")),
-            requiredString(item, "material"), item.getString("encoded-template"),
-            item.getString("fingerprint"));
-      }
-      definitions.put(marketId, new MarketDefinition(marketId,
-          requiredString(market, "display-name"), market.getBoolean("enabled"),
-          itemDefinition, structuralRules(market), riskRules(market, riskDefaults),
-          market.getBoolean("block-container-shops"),
-          security == null ? AssetType.PHYSICAL_ITEM : AssetType.VIRTUAL_SECURITY,
-          security == null ? null : new SecurityDefinition(
-              requiredString(security, "symbol"), requiredString(security, "name"),
-              requiredString(security, "description"), requiredString(market, "currency"),
-              decimal(security, "base-price"), security.getLong("total-supply"),
-              security.getLong("minimum-unit"))));
     }
     return new MarketRegistry(definitions, persistence);
   }
