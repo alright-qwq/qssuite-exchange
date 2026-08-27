@@ -11,6 +11,18 @@
 5. 每天对托管（custody）进行对账。在重新打开被暂停的市场之前，调查 `REVIEW_REQUIRED` 转账、熔断停牌、写入锁失败、SQL 延迟，以及任何托管差异。
 6. 按市场逐步扩大白名单和上限。启用 `block-container-shops` 会阻止该市场的物品今后再创建容器商店，但不会迁移或取消已有商店。
 
+## 配置热重载
+
+修改 `config.yml` 或 `markets.yml` 后，执行 `/qse reload`（需要 `quickshop.exchange.admin.reload`），无需重启服务器。重载会热应用：
+
+- `market-data.gui-refresh-ms`、`market-data.candle-retention-days`、`operations.reconciliation-interval-minutes`
+- 各市场的风险参数（价格笼、滑点、停牌阈值、持仓/挂单上限、操作频率）与 maker/taker 费率
+- 市场显示名与虚拟证券元数据（新名称立即反映到已打开的界面）
+
+费率/风险变更通过重载落库为新的版本，重启后依然生效。重载会校验整个配置；如果某个市场的结构性字段（币种、价格区间、tick、数量档、资产类型等）发生变化，会明确列出是哪个市场、哪个字段，并提示先暂停该市场、取消未平仓订单再重试。配置文件本身非法时，会提示修正文件后重试，上一份设置仍然生效。不要在未执行重载的情况下直接改 `markets.yml` 的费率后重启：数据库中的活跃费率与文件不一致会导致启动安全失败。
+
+`enabled: false` 只影响市场/证券的初始创建状态；运行时启用或停用市场请使用 `/qse admin market pause|resume`，不要依赖修改 `enabled` 后重载。
+
 ## 数据库与恢复
 
 `database.mode: quickshop` 需要共享的 MySQL 数据库。插件持有一把专用 MySQL 咨询写入锁，名为 `<dbPrefix>exchange_writer`；第二个匹配器实例必须启动失败。锁断开时立即施加本地写入围栏（write fence）。由于此时所有权已不可信，旧实例不再执行任何数据库变更，包括尝试把市场标记为 `RECOVERING`。持久化的恢复状态只能由之后合法取得写入所有权的启动流程建立；不要让被围栏隔离的实例自动重试或重新夺锁。
