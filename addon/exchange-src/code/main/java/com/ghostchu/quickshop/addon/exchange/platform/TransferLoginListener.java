@@ -27,6 +27,19 @@ public final class TransferLoginListener implements Listener {
   }
 
   void recover(UUID accountId) {
-    recovery.apply(Objects.requireNonNull(accountId, "accountId"));
+    java.util.concurrent.CompletableFuture<?> pending =
+        recovery.apply(Objects.requireNonNull(accountId, "accountId"));
+    if (pending == null) {
+      return;
+    }
+    pending.whenComplete((ignored, failure) -> {
+      if (failure != null) {
+        LOGGER.log(java.util.logging.Level.WARNING,
+            "Exchange transfer recovery failed for account " + accountId, failure);
+      }
+    });
   }
+
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.TransferRecovery");
 }

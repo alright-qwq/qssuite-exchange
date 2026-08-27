@@ -21,4 +21,14 @@ class TransferLoginListenerTest {
 
     assertThat(recovered).hasValue(accountId);
   }
+
+  @Test
+  void observesRecoveryFailureWithoutPropagatingToTheCaller() {
+    TransferLoginListener listener = new TransferLoginListener(accountId ->
+        CompletableFuture.failedFuture(new IllegalStateException("database unavailable")));
+
+    // Must not throw: the failed future is observed by an internal completion handler that
+    // logs it, so a recovery failure cannot crash the join event pipeline.
+    listener.recover(UUID.randomUUID());
+  }
 }
