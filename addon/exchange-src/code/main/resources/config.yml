@@ -24,6 +24,8 @@ risk-defaults:
 operations:
   # 对账自动执行间隔（分钟），0 表示禁用自动对账
   reconciliation-interval-minutes: 1440
+  # 玩家背包访问在实体线程上的最大等待毫秒数；超时按离线处理并进入对账，避免永久卡死
+  inventory-access-timeout-ms: 10000
   audit-export-directory: audit
 rollout:
   # 上线初期建议开启白名单；正式开放后设为 false 即可对全部玩家开放

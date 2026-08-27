@@ -3,12 +3,15 @@ package com.ghostchu.quickshop.addon.exchange.platform;
 import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.transfer.InventoryGateway;
 import com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -26,11 +29,13 @@ public final class FoliaInventoryGateway implements InventoryGateway {
   private final BiPredicate<ItemStack, ItemStack> itemMatcher;
   private final Function<ItemStack, String> stackEncoder;
   private final NamespacedKey transferMarker;
+  private final AtomicLong timeoutMillis = new AtomicLong(DEFAULT_TIMEOUT_MILLIS);
 
   public FoliaInventoryGateway(QuickShop quickShop, NamespacedKey transferMarker) {
     this(
         Bukkit::getPlayer,
-        (player, action) -> QuickShop.folia().getScheduler().runAtEntityLater(player, action, 1L),
+        (player, action) -> QuickShop.folia().getScheduler().runAtEntityWithFallback(
+            player, ignored -> action.run(), () -> action.run()),
         quickShop.getItemMatcher()::matches,
         quickShop.platform()::encodeStack,
         transferMarker);
@@ -47,6 +52,15 @@ public final class FoliaInventoryGateway implements InventoryGateway {
     this.itemMatcher = Objects.requireNonNull(itemMatcher, "itemMatcher");
     this.stackEncoder = Objects.requireNonNull(stackEncoder, "stackEncoder");
     this.transferMarker = Objects.requireNonNull(transferMarker, "transferMarker");
+  }
+
+  /** Hot-updatable wait budget for a single entity-scheduled inventory access. */
+  public void updateTimeout(Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    if (timeout.isNegative() || timeout.isZero()) {
+      throw new IllegalArgumentException("timeout must be positive");
+    }
+    timeoutMillis.set(timeout.toMillis());
   }
 
   @Override
@@ -235,6 +249,17 @@ public final class FoliaInventoryGateway implements InventoryGateway {
     } catch (RuntimeException failure) {
       future.completeExceptionally(failure);
     }
+    long timeout = timeoutMillis.get();
+    if (timeout > 0) {
+      future.completeOnTimeout(offlineResult, timeout, TimeUnit.MILLISECONDS);
+    }
+    future.whenComplete((result, failure) -> {
+      if (failure == null) {
+        return;
+      }
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "exchange inventory access failed for player " + playerId, failure);
+    });
     return future;
   }
 
@@ -360,4 +385,8 @@ public final class FoliaInventoryGateway implements InventoryGateway {
     }
     return copy;
   }
+
+  private static final long DEFAULT_TIMEOUT_MILLIS = Duration.ofSeconds(10).toMillis();
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.Inventory");
 }

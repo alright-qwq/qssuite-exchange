@@ -37,6 +37,29 @@ class FoliaInventoryGatewayTest {
   }
 
   @Test
+  void entityTaskThatNeverRunsCompletesViaTimeoutInsteadOfHanging() {
+    PlayerMock player = server.addPlayer();
+    NamespacedKey marker = new NamespacedKey("exchange", "transfer");
+    FoliaInventoryGateway gateway = new FoliaInventoryGateway(
+        playerId -> playerId.equals(player.getUniqueId()) ? player : null,
+        (scheduledPlayer, task) -> { /* the entity scheduler silently drops this task */ },
+        ItemStack::isSimilar,
+        FoliaInventoryGatewayTest::encode,
+        marker);
+    gateway.updateTimeout(java.time.Duration.ofMillis(150));
+    long started = System.nanoTime();
+
+    InventoryResult result = gateway.markForDeposit(
+        player.getUniqueId(), new ItemStack(Material.DIAMOND), 1, UUID.randomUUID())
+        .join();
+
+    long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+        System.nanoTime() - started);
+    assertThat(result).isEqualTo(InventoryResult.OFFLINE);
+    assertThat(elapsedMillis).isGreaterThanOrEqualTo(100L);
+  }
+
+  @Test
   void fullInventoryDoesNotReceivePartialMarkedDelivery() {
     GatewayFixture fixture = onlineFixture();
     for (int slot = 0; slot < fixture.player().getInventory().getStorageContents().length; slot++) {

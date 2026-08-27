@@ -78,6 +78,7 @@ public final class ExchangeRuntimeFactory {
   private volatile ExchangeActionService actions;
   private volatile ExchangeViewService views;
   private volatile AdminExchangeService administration;
+  private volatile FoliaInventoryGateway inventoryGateway;
   private volatile ScheduledExecutorService maintenance;
   /** Volatile scheduler settings re-read on every reload so they hot-apply without a restart. */
   private volatile int candleRetentionDays = 365;
@@ -160,6 +161,8 @@ public final class ExchangeRuntimeFactory {
     PlayerOperationSerialiser playerOperations = new PlayerOperationSerialiser();
     NamespacedKey marker = new NamespacedKey(addon, "exchange-transfer");
     FoliaInventoryGateway inventory = new FoliaInventoryGateway(quickShop, marker);
+    inventory.updateTimeout(inventoryAccessTimeout(addon.getConfig()));
+    this.inventoryGateway = inventory;
     MoneyTransferService moneyTransfers = new MoneyTransferService(repository, repository,
         new QuickShopEconomyGateway(quickShop, economyWorld()), playerOperations,
         Clock.systemUTC(), UUID::randomUUID);
@@ -334,6 +337,15 @@ public final class ExchangeRuntimeFactory {
     unregisterRuntimeListeners();
   }
 
+  /** Resolves the entity-scheduled inventory wait budget from config with a sane default. */
+  private static Duration inventoryAccessTimeout(FileConfiguration config) {
+    long configured = config.getLong("operations.inventory-access-timeout-ms", 10000);
+    if (configured < 250) {
+      return Duration.ofMillis(250);
+    }
+    return Duration.ofMillis(configured);
+  }
+
   /** Re-reads markets.yml/config.yml and hot-applies operational risk settings. */
   public void reloadConfig() {
     synchronized (lifecycleLock) {
@@ -409,6 +421,10 @@ public final class ExchangeRuntimeFactory {
         long guiRefreshMs = Math.max(250L, addon.getConfig().getLong(
             "market-data.gui-refresh-ms", 1000));
         liveViews.updateRefreshInterval(java.time.Duration.ofMillis(guiRefreshMs));
+      }
+      FoliaInventoryGateway liveInventory = this.inventoryGateway;
+      if (liveInventory != null) {
+        liveInventory.updateTimeout(inventoryAccessTimeout(addon.getConfig()));
       }
       FileConfiguration config = addon.getConfig();
       this.candleRetentionDays = Math.max(1, config.getInt(
