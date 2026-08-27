@@ -54,7 +54,14 @@ public final class QuickShopEconomyGateway implements EconomyGateway {
           : provider.deposit(user, worldName, providerCurrency, amount);
       return success ? ExternalResult.SUCCESS : ExternalResult.FAILURE;
     } catch (RuntimeException failure) {
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "Economy " + (withdraw ? "withdrawal" : "deposit") + " failed for player "
+              + playerId + " (" + currencyId + ", " + amount.toPlainString() + ")",
+          failure);
       return ExternalResult.UNKNOWN;
     }
   }
+
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.Economy");
 }
