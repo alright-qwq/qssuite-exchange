@@ -61,7 +61,9 @@ public final class Main extends JavaPlugin implements Listener {
         startExchange();
       }
     } catch (Exception failure) {
-      cleanupAfterFailedStart();
+      synchronized (lifecycleLock) {
+        cleanupAfterFailedStart();
+      }
       getLogger().log(Level.SEVERE,
           "Exchange startup failed; addon remains disabled. Fix the configuration and run"
               + " /qse reload to retry without restarting the server. Cause:", failure);
@@ -109,24 +111,26 @@ public final class Main extends JavaPlugin implements Listener {
   }
 
   private void cleanupAfterFailedStart() {
-    ExchangeRuntime failedRuntime = runtime;
-    ExchangeRuntimeFactory failedFactory = runtimeFactory;
-    runtime = null;
-    runtimeFactory = null;
-    mainListenerRegistered = false;
-    ShutdownSequence.close(this::unregisterPlayerEntrypoints,
-        () -> {
-          if (failedRuntime != null) {
-            failedRuntime.close();
-          }
-        }, cleanupFailure -> getLogger().log(Level.SEVERE,
-            "Exchange startup cleanup failed", cleanupFailure));
-    if (failedFactory != null) {
-      try {
-        failedFactory.closeListeners();
-      } catch (Exception cleanupFailure) {
-        getLogger().log(Level.SEVERE,
-            "Exchange startup listener cleanup failed", cleanupFailure);
+    synchronized (lifecycleLock) {
+      ExchangeRuntime failedRuntime = runtime;
+      ExchangeRuntimeFactory failedFactory = runtimeFactory;
+      runtime = null;
+      runtimeFactory = null;
+      mainListenerRegistered = false;
+      ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+          () -> {
+            if (failedRuntime != null) {
+              failedRuntime.close();
+            }
+          }, cleanupFailure -> getLogger().log(Level.SEVERE,
+              "Exchange startup cleanup failed", cleanupFailure));
+      if (failedFactory != null) {
+        try {
+          failedFactory.closeListeners();
+        } catch (Exception cleanupFailure) {
+          getLogger().log(Level.SEVERE,
+              "Exchange startup listener cleanup failed", cleanupFailure);
+        }
       }
     }
   }
