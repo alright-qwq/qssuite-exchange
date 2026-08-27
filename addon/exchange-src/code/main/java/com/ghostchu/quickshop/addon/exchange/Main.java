@@ -38,6 +38,7 @@ public final class Main extends JavaPlugin implements Listener {
   private ExchangeMenuListener menuListener;
   private DrainingExecutor adminReads;
   private boolean mainListenerRegistered;
+  private final Object lifecycleLock = new Object();
 
   static java.util.List<String> firstRunResources() {
     return java.util.List.of("markets.yml", "messages.yml");
@@ -56,7 +57,9 @@ public final class Main extends JavaPlugin implements Listener {
       return;
     }
     try {
-      startExchange();
+      synchronized (lifecycleLock) {
+        startExchange();
+      }
     } catch (Exception failure) {
       cleanupAfterFailedStart();
       getLogger().log(Level.SEVERE,
@@ -70,29 +73,31 @@ public final class Main extends JavaPlugin implements Listener {
    * runtime teardown because it first releases any previous runtime and entry points.
    */
   private void startExchange() throws Exception {
-    ExchangeRuntimeFactory previousFactory = runtimeFactory;
-    if (previousFactory != null) {
-      try {
-        previousFactory.closeListeners();
-      } catch (Exception cleanupFailure) {
-        getLogger().log(Level.SEVERE,
-            "Exchange previous listener cleanup failed", cleanupFailure);
+    synchronized (lifecycleLock) {
+      ExchangeRuntimeFactory previousFactory = runtimeFactory;
+      if (previousFactory != null) {
+        try {
+          previousFactory.closeListeners();
+        } catch (Exception cleanupFailure) {
+          getLogger().log(Level.SEVERE,
+              "Exchange previous listener cleanup failed", cleanupFailure);
+        }
       }
+      ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+          () -> {
+            if (runtime != null) {
+              runtime.close();
+            }
+          }, failure -> getLogger().log(Level.SEVERE,
+              "Exchange previous runtime cleanup failed", failure));
+      runtime = null;
+      runtimeFactory = new ExchangeRuntimeFactory(this, QuickShop.getInstance());
+      ExchangeRuntime started = runtimeFactory.create();
+      started.start();
+      runtime = started;
+      registerPlayerEntrypoints();
+      registerMainListener();
     }
-    ShutdownSequence.close(this::unregisterPlayerEntrypoints,
-        () -> {
-          if (runtime != null) {
-            runtime.close();
-          }
-        }, failure -> getLogger().log(Level.SEVERE,
-            "Exchange previous runtime cleanup failed", failure));
-    runtime = null;
-    runtimeFactory = new ExchangeRuntimeFactory(this, QuickShop.getInstance());
-    ExchangeRuntime started = runtimeFactory.create();
-    started.start();
-    runtime = started;
-    registerPlayerEntrypoints();
-    registerMainListener();
   }
 
   private void registerMainListener() {
@@ -128,22 +133,24 @@ public final class Main extends JavaPlugin implements Listener {
 
   @Override
   public void onDisable() {
-    ExchangeRuntime activeRuntime = runtime;
-    ExchangeRuntimeFactory activeFactory = runtimeFactory;
-    mainListenerRegistered = false;
-    ShutdownSequence.close(this::unregisterPlayerEntrypoints,
-        () -> {
-          if (activeRuntime != null) {
-            activeRuntime.close();
-          }
-        }, failure -> getLogger().log(Level.SEVERE, "Exchange shutdown cleanup failed", failure));
-    runtime = null;
-    runtimeFactory = null;
-    if (activeFactory != null) {
-      try {
-        activeFactory.closeListeners();
-      } catch (Exception cleanupFailure) {
-        getLogger().log(Level.SEVERE, "Exchange listener cleanup failed", cleanupFailure);
+    synchronized (lifecycleLock) {
+      ExchangeRuntime activeRuntime = runtime;
+      ExchangeRuntimeFactory activeFactory = runtimeFactory;
+      mainListenerRegistered = false;
+      ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+          () -> {
+            if (activeRuntime != null) {
+              activeRuntime.close();
+            }
+          }, failure -> getLogger().log(Level.SEVERE, "Exchange shutdown cleanup failed", failure));
+      runtime = null;
+      runtimeFactory = null;
+      if (activeFactory != null) {
+        try {
+          activeFactory.closeListeners();
+        } catch (Exception cleanupFailure) {
+          getLogger().log(Level.SEVERE, "Exchange listener cleanup failed", cleanupFailure);
+        }
       }
     }
   }
@@ -158,35 +165,37 @@ public final class Main extends JavaPlugin implements Listener {
    * Returns a structured result that callers may surface to the player in their locale.
    */
   public ReloadResult reloadExchangeConfig() {
-    ExchangeRuntime activeRuntime = runtime;
-    ExchangeRuntimeFactory factory = runtimeFactory;
-    if (activeRuntime == null) {
-      getLogger().info("Exchange runtime is not started; attempting a full startup recovery");
+    synchronized (lifecycleLock) {
+      ExchangeRuntime activeRuntime = runtime;
+      ExchangeRuntimeFactory factory = runtimeFactory;
+      if (activeRuntime == null) {
+        getLogger().info("Exchange runtime is not started; attempting a full startup recovery");
+        try {
+          startExchange();
+          return new ReloadResult(true, null);
+        } catch (Exception failure) {
+          cleanupAfterFailedStart();
+          getLogger().log(Level.SEVERE,
+              "Exchange startup recovery failed; previous configuration is still in effect. Cause:",
+              failure);
+          String cause = failure.getMessage() == null
+              ? failure.getClass().getSimpleName() : failure.getMessage();
+          return new ReloadResult(false, cause);
+        }
+      }
       try {
-        startExchange();
+        reloadConfig();
+        factory.reloadConfig();
+        rewirePlayerEntrypoints();
+        getLogger().info("Exchange configuration reloaded successfully");
         return new ReloadResult(true, null);
       } catch (Exception failure) {
-        cleanupAfterFailedStart();
         getLogger().log(Level.SEVERE,
-            "Exchange startup recovery failed; previous configuration is still in effect. Cause:",
-            failure);
+            "Exchange configuration reload failed; keeping previous settings. Cause:", failure);
         String cause = failure.getMessage() == null
             ? failure.getClass().getSimpleName() : failure.getMessage();
         return new ReloadResult(false, cause);
       }
-    }
-    try {
-      reloadConfig();
-      factory.reloadConfig();
-      rewirePlayerEntrypoints();
-      getLogger().info("Exchange configuration reloaded successfully");
-      return new ReloadResult(true, null);
-    } catch (Exception failure) {
-      getLogger().log(Level.SEVERE,
-          "Exchange configuration reload failed; keeping previous settings. Cause:", failure);
-      String cause = failure.getMessage() == null
-          ? failure.getClass().getSimpleName() : failure.getMessage();
-      return new ReloadResult(false, cause);
     }
   }
 
