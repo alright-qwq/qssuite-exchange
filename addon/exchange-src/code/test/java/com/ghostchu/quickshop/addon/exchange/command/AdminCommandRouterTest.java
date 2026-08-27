@@ -63,6 +63,30 @@ class AdminCommandRouterTest {
   }
 
   @Test
+  void reportsInvalidStockNumbersInsteadOfThrowing() {
+    Actor actor = new Actor("quickshop.exchange.admin.stock");
+    AdminCommandRouter router = new AdminCommandRouter(new AdminExchangeService(
+        Map.of()), UUID::randomUUID);
+
+    router.execute(actor, new String[] {"stock", "create", "ALPHA", "Alpha",
+        "default", "10.00", "not-a-number", "1", "Concept stock"});
+
+    assertThat(actor.message).isEqualTo("admin-command-invalid");
+  }
+
+  @Test
+  void reportsInvalidUuidInStockTransferInsteadOfThrowing() {
+    Actor actor = new Actor("quickshop.exchange.admin.stock");
+    AdminCommandRouter router = new AdminCommandRouter(new AdminExchangeService(
+        Map.of()), UUID::randomUUID);
+
+    router.execute(actor, new String[] {"stock", "transfer", "ALPHA",
+        "not-a-uuid", "00000000-0000-0000-0000-000000000001", "10", "audit"});
+
+    assertThat(actor.message).isEqualTo("admin-command-invalid");
+  }
+
+  @Test
   void pausesAndResumesMarketsWithTheDedicatedMarketPermission() throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
     AdminCommandRouter router = new AdminCommandRouter(new AdminExchangeService(

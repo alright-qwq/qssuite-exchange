@@ -378,8 +378,9 @@ public final class ExchangeRuntimeFactory {
       throw new IllegalArgumentException(String.join("; ", allBlockers)
           + ". Pause the affected markets, cancel their open orders, then retry /qse reload");
     }
-    // The structure is unchanged, so the state reader is never consulted: reload only advances
-    // risk/fee versions, persists them atomically and swaps the live definitions in one step.
+    // Commit the registry first: its persistence write is the only step that can fail, and a
+    // failure leaves the registry (and therefore every service/view) untouched. The subsequent
+    // in-memory applications are pure swaps that cannot fail once the definitions are committed.
     liveRegistry.reload(reloaded.definitions(),
         ignored -> new MarketStateReader.State(MarketStatus.PAUSED, 0));
     for (String marketId : liveMarkets.keySet()) {
