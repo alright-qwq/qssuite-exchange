@@ -35,7 +35,10 @@ class AddonMessageServiceTest {
         .isEqualTo("Request: abc-123");
     assertThat(messages.message("ui-confirm-submit-failed", Locale.forLanguageTag("zh-CN")))
         .isEqualTo("交易请求提交失败，请稍后重试。");
-    assertThat(messages.message("ui-confirm-submit-result", Locale.US, "ACCEPTED", "order-1"))
-        .isEqualTo("Exchange ACCEPTED: order-1");
+    assertThat(messages.message("ui-confirm-submit-accepted", Locale.US, "order-1"))
+        .isEqualTo("Exchange request accepted: order-1");
+    assertThat(messages.message("ui-confirm-submit-rejected",
+        Locale.forLanguageTag("zh-CN"), "order-1", "RATE_LIMITED"))
+        .isEqualTo("交易所请求被拒绝：order-1（RATE_LIMITED）");
   }
 }

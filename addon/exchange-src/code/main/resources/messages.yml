@@ -216,7 +216,10 @@ en-US:
   ui-confirm-cancel-release-currency: 'Frozen currency released on cancel: <0>'
   ui-confirm-cancel-release-quantity: 'Frozen quantity released on cancel: <0>'
   ui-confirm-submit-failed: Exchange request submission failed. Please try again later.
-  ui-confirm-submit-result: 'Exchange <0>: <1>'
+  ui-confirm-submit-accepted: 'Exchange request accepted: <0>'
+  ui-confirm-submit-review: 'Transfer <0> needs administrator review: <1>'
+  ui-confirm-submit-rejected: 'Exchange request rejected: <0> (<1>)'
+  ui-confirm-submit-failed-outcome: 'Exchange request failed: <0> (<1>)'
   ui-confirm-back-market: Back to market
   ui-admin-market: Market controls
   ui-admin-market-usage: '/qse admin market pause <market> <reason>'
@@ -446,7 +449,10 @@ zh-CN:
   ui-confirm-cancel-release-currency: '撤销后释放冻结资金：<0>'
   ui-confirm-cancel-release-quantity: '撤销后释放冻结数量：<0>'
   ui-confirm-submit-failed: '交易请求提交失败，请稍后重试。'
-  ui-confirm-submit-result: '交易所请求 <0>：<1>'
+  ui-confirm-submit-accepted: '交易所请求已受理：<0>'
+  ui-confirm-submit-review: '转账 <0> 需要管理员审核：<1>'
+  ui-confirm-submit-rejected: '交易所请求被拒绝：<0>（<1>）'
+  ui-confirm-submit-failed-outcome: '交易所请求处理失败：<0>（<1>）'
   ui-confirm-back-market: 返回市场
   ui-admin-market: 市场控制
   ui-admin-market-usage: '/qse admin market pause <市场> <原因>'

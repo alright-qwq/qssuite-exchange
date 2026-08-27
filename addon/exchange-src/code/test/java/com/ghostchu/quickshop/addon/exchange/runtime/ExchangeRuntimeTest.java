@@ -177,6 +177,16 @@ class ExchangeRuntimeTest {
   }
 
   @Test
+  void mapsRiskRejectionsToRejectedWithAReadableReason() {
+    assertThat(RuntimeExchangeRequestSubmitter.rejectionReason(
+        new IllegalStateException("RATE_LIMITED")))
+        .isEqualTo(com.ghostchu.quickshop.addon.exchange.core.risk.OrderRiskService.RejectReason.RATE_LIMITED);
+    assertThat(RuntimeExchangeRequestSubmitter.rejectionReason(
+        new IllegalStateException("database locked")))
+        .isNull();
+  }
+
+  @Test
   void rejectsNonConfirmableRequestInsteadOfInventingRequestId() {
     ExchangeRuntime runtime = new ExchangeRuntime(new TrackingGuard(new AtomicBoolean()),
         () -> {}, () -> {}, () -> {});

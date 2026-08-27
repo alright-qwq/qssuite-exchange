@@ -1,6 +1,7 @@
 package com.ghostchu.quickshop.addon.exchange.runtime;
 
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
+import com.ghostchu.quickshop.addon.exchange.core.risk.OrderRiskService;
 import com.ghostchu.quickshop.addon.exchange.service.OrderReceipt;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferStatus;
@@ -53,7 +54,7 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
       return transfer(request);
     }
     return CompletableFuture.completedFuture(new SubmissionResult(
-        request.requestId(), Outcome.REJECTED, "request is not confirmable"));
+        request.requestId(), Outcome.REJECTED, "request is not confirmable", null));
   }
 
   private SubmissionResult order(ExchangeMenuRequest request) {
@@ -61,11 +62,16 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
       Optional<OrderReceipt> receipt = runtime.callWhileWriting(
           () -> runtime.actions().submitOrder(request.order()));
       if (receipt.isEmpty()) return unavailable(request);
-      Outcome outcome = "REJECTED".equals(receipt.orElseThrow().status())
-          ? Outcome.REJECTED : Outcome.ACCEPTED;
-      return new SubmissionResult(request.requestId(), outcome, receipt.orElseThrow().orderId().toString());
+      return new SubmissionResult(request.requestId(), Outcome.ACCEPTED,
+          receipt.orElseThrow().orderId().toString(), null);
     } catch (Exception failure) {
-      return new SubmissionResult(request.requestId(), Outcome.FAILED, failure.getClass().getSimpleName());
+      OrderRiskService.RejectReason rejection = rejectionReason(failure);
+      if (rejection != null) {
+        return new SubmissionResult(request.requestId(), Outcome.REJECTED,
+            rejection.name(), null);
+      }
+      return new SubmissionResult(request.requestId(), Outcome.FAILED,
+          failure.getClass().getSimpleName(), failure.getMessage());
     }
   }
 
@@ -75,9 +81,13 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
           () -> runtime.actions().cancel(request.accountId(), request.requestId(), request.orderId()));
       if (receipt.isEmpty()) return unavailable(request);
       return new SubmissionResult(request.requestId(), Outcome.ACCEPTED,
-          receipt.orElseThrow().orderId().toString());
+          receipt.orElseThrow().orderId().toString(), null);
+    } catch (IllegalArgumentException failure) {
+      return new SubmissionResult(request.requestId(), Outcome.REJECTED,
+          failure.getMessage(), failure.getMessage());
     } catch (Exception failure) {
-      return new SubmissionResult(request.requestId(), Outcome.FAILED, failure.getClass().getSimpleName());
+      return new SubmissionResult(request.requestId(), Outcome.FAILED,
+          failure.getClass().getSimpleName(), failure.getMessage());
     }
   }
 
@@ -87,7 +97,7 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
         .handle((completed, failure) -> {
           if (failure != null) {
             return new SubmissionResult(request.requestId(), Outcome.FAILED,
-                failure.getClass().getSimpleName());
+                failure.getClass().getSimpleName(), failure.getMessage());
           }
           if (completed.isEmpty()) {
             return unavailable(request);
@@ -96,12 +106,30 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
           Outcome outcome = transfer.status() == TransferStatus.REVIEW_REQUIRED
               ? Outcome.REVIEW_REQUIRED : transfer.status() == TransferStatus.FAILED
               ? Outcome.REJECTED : Outcome.ACCEPTED;
-          return new SubmissionResult(request.requestId(), outcome, transfer.transferId().toString());
+          return new SubmissionResult(request.requestId(), outcome,
+              transfer.transferId().toString(), transfer.failureReason());
         });
   }
 
   private static SubmissionResult unavailable(ExchangeMenuRequest request) {
-    return new SubmissionResult(request.requestId(), Outcome.REJECTED, "writer unavailable");
+    return new SubmissionResult(request.requestId(), Outcome.REJECTED,
+        "writer unavailable", null);
+  }
+
+  static OrderRiskService.RejectReason rejectionReason(Throwable failure) {
+    if (!(failure instanceof IllegalStateException rejected)) {
+      return null;
+    }
+    String message = rejected.getMessage();
+    if (message == null) {
+      return null;
+    }
+    for (OrderRiskService.RejectReason reason : OrderRiskService.RejectReason.values()) {
+      if (reason.name().equals(message)) {
+        return reason;
+      }
+    }
+    return null;
   }
 
   @Override

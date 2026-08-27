@@ -339,8 +339,15 @@ final class RequestSummaryPage {
         if (failure != null) {
           onlinePlayer.sendMessage(messages.component(onlinePlayer, "ui-confirm-submit-failed"));
         } else {
-          onlinePlayer.sendMessage(messages.component(onlinePlayer, "ui-confirm-submit-result",
-              result.outcome(), result.reference()));
+          String key = switch (result.outcome()) {
+            case ACCEPTED -> "ui-confirm-submit-accepted";
+            case REVIEW_REQUIRED -> "ui-confirm-submit-review";
+            case REJECTED -> "ui-confirm-submit-rejected";
+            case FAILED -> "ui-confirm-submit-failed-outcome";
+          };
+          String reason = result.reason() == null ? "" : result.reason();
+          onlinePlayer.sendMessage(messages.component(onlinePlayer, key,
+              result.reference(), reason));
           navigateAfterSubmit(onlinePlayer, request, result);
         }
       }, 1L);
