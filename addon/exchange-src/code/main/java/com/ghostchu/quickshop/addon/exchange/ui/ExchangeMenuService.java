@@ -19,6 +19,8 @@ public final class ExchangeMenuService implements AutoCloseable {
   private final ExchangeRequestSubmitter submitter;
   private final ExchangeMenuContextStore contexts;
   private final ExchangeMenuLifecycle lifecycle;
+  private final java.util.concurrent.atomic.AtomicBoolean closed =
+      new java.util.concurrent.atomic.AtomicBoolean();
 
   public ExchangeMenuService(ExchangeViewService views) {
     this(views, null, RolloutPolicy.DISABLED, null);
@@ -92,6 +94,12 @@ public final class ExchangeMenuService implements AutoCloseable {
 
   @Override
   public void close() {
+    if (closed.compareAndSet(false, true)) {
+      closeOnce();
+    }
+  }
+
+  private void closeOnce() {
     for (UUID playerId : contexts.playerIds()) {
       views.unsubscribeMarketUpdates(playerId);
       com.ghostchu.quickshop.menu.shared.GuiChatInputManager.getInstance().cancelInput(playerId);
