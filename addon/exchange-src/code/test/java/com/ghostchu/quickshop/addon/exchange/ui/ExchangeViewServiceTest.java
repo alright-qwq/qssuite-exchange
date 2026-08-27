@@ -267,6 +267,28 @@ class ExchangeViewServiceTest {
   }
 
   @Test
+  void hotUpdateRefreshIntervalRetunesPacingWithoutReopeningViews() throws Exception {
+    MarketDataService marketData = new MarketDataService(new CandleAggregator());
+    ExchangeViewService views = new ExchangeViewService(java.util.Map.of(), marketData,
+        Runnable::run);
+    UUID playerId = UUID.randomUUID();
+    AtomicInteger updates = new AtomicInteger();
+    views.subscribeMarketUpdates(playerId, update -> updates.incrementAndGet());
+
+    views.updateRefreshInterval(java.time.Duration.ofMillis(100));
+    marketData.recordTrade("diamond-usd", new BigDecimal("100"), 1, Instant.EPOCH);
+    marketData.publishPlayerUpdates();
+    Thread.sleep(180);
+    marketData.recordTrade("diamond-usd", new BigDecimal("101"), 1, Instant.EPOCH.plusSeconds(1));
+    marketData.publishPlayerUpdates();
+    marketData.recordTrade("diamond-usd", new BigDecimal("102"), 1, Instant.EPOCH.plusSeconds(2));
+    marketData.publishPlayerUpdates();
+
+    // The retuned interval allows a second refresh well before the original one-second pacing.
+    assertThat(updates.get()).isGreaterThanOrEqualTo(2);
+  }
+
+  @Test
   void resolvesSecuritySymbolToItsMarketIdCaseInsensitively() throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
     MarketDataService marketData = new MarketDataService(new CandleAggregator());

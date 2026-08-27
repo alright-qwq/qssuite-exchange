@@ -100,6 +100,38 @@ class ExchangeRuntimeFactoryTest {
   }
 
   @Test
+  void reloadBlockerDiagnosisNamesTheChangedFieldsPerMarket() {
+    MarketDefinition diamond = fixtureDefinition("0.01", "0.001", "0.002");
+    MarketDefinition changed = new MarketDefinition(diamond.marketId(), diamond.displayName(),
+        diamond.enabled(), diamond.item(),
+        new MarketDefinition.StructuralRules("default", new BigDecimal("110.00"),
+            BigDecimal.ONE, new BigDecimal("10000.00"), new BigDecimal("0.01"), 2, 2,
+            1, 2304, 100),
+        diamond.risk(), diamond.blockContainerShops(), diamond.assetType(), diamond.security());
+
+    assertThat(ExchangeRuntimeFactory.describeReloadBlockers(diamond, changed))
+        .anyMatch(message -> message.contains("base price changed from 100.00 to 110.00"));
+  }
+
+  @Test
+  void reloadBlockerDiagnosisIsEmptyForRiskOnlyChanges() {
+    MarketDefinition diamond = fixtureDefinition("0.01", "0.001", "0.002");
+    MarketDefinition riskOnly = new MarketDefinition(diamond.marketId(), diamond.displayName(),
+        diamond.enabled(), diamond.item(), diamond.structural(),
+        new MarketDefinition.RiskRules(new BigDecimal("0.001"), new BigDecimal("0.002"),
+            new BigDecimal("0.30"), diamond.risk().defaultMarketSlippage(),
+            diamond.risk().maximumMarketSlippage(), diamond.risk().levelOneMove(),
+            diamond.risk().levelOneHaltSeconds(), diamond.risk().levelTwoMove(),
+            diamond.risk().levelTwoHaltSeconds(), diamond.risk().maxAccountHolding(),
+            diamond.risk().maxFrozenCurrency(), diamond.risk().maxOpenOrders(),
+            diamond.risk().operationsPerSecond(), diamond.risk().operationsPerMinute()),
+        diamond.blockContainerShops(), diamond.assetType(), diamond.security());
+
+    assertThat(ExchangeRuntimeFactory.describeReloadBlockers(diamond, riskOnly)).isEmpty();
+    assertThat(ExchangeRuntimeFactory.requireReloadableStructure(diamond, riskOnly)).isTrue();
+  }
+
+  @Test
   void reloadAllowsRiskOnlyChangesAndIgnoresDecimalScaleDifferences() {
     MarketDefinition diamond = fixtureDefinition("0.01", "0.001", "0.002");
     MarketDefinition riskOnly = fixtureDefinition("0.01",

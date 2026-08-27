@@ -35,7 +35,7 @@ public final class ExchangeViewService {
   private final ExchangeRepository repository;
   private final List<TransferTarget> transferTargets;
   private final MarketListPresenter presenter = new MarketListPresenter();
-  private final Duration marketUpdateMinInterval;
+  private volatile Duration marketUpdateMinInterval;
   private final java.util.Map<UUID, Long> lastMarketRefresh =
       new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -80,6 +80,18 @@ public final class ExchangeViewService {
     Map<String, MarketView> extended = new LinkedHashMap<>(markets);
     extended.put(view.marketId(), view);
     this.markets = Map.copyOf(extended);
+  }
+
+  /**
+   * Hot-applies the GUI market refresh minimum interval. Existing player subscriptions pick up the
+   * new pacing on their next published update without re-opening the view.
+   */
+  public void updateRefreshInterval(Duration marketUpdateMinInterval) {
+    Objects.requireNonNull(marketUpdateMinInterval, "marketUpdateMinInterval");
+    if (marketUpdateMinInterval.isZero() || marketUpdateMinInterval.isNegative()) {
+      throw new IllegalArgumentException("market update interval must be positive");
+    }
+    this.marketUpdateMinInterval = marketUpdateMinInterval;
   }
 
   /** Returns a snapshot of the current transfer targets, including hot-added markets. */

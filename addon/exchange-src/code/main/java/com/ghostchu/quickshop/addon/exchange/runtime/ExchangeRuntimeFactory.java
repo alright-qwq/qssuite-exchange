@@ -77,6 +77,9 @@ public final class ExchangeRuntimeFactory {
   private volatile ExchangeActionService actions;
   private volatile ExchangeViewService views;
   private volatile AdminExchangeService administration;
+  /** Volatile scheduler settings re-read on every reload so they hot-apply without a restart. */
+  private volatile int candleRetentionDays = 365;
+  private volatile int reconciliationIntervalMinutes = 1440;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
     this.addon = java.util.Objects.requireNonNull(addon, "addon");
@@ -254,15 +257,11 @@ public final class ExchangeRuntimeFactory {
     maintenance.scheduleWithFixedDelay(resumeHalted, 1L, 1L, TimeUnit.MINUTES);
     maintenance.scheduleWithFixedDelay(() -> flushWhileOwned(
         database.writer(), marketData, Instant.now()), 1L, 1L, TimeUnit.MINUTES);
-    int candleRetentionDays = Math.max(1, addon.getConfig().getInt(
-        "market-data.candle-retention-days", 365));
     java.util.List<String> marketIds = java.util.List.copyOf(registry.marketIds());
     maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
         database.writer(), () -> marketData.purgeOldCandles(
             java.time.Duration.ofDays(candleRetentionDays), marketIds)),
         30L, 24L * 60L, TimeUnit.MINUTES);
-    int reconciliationIntervalMinutes = addon.getConfig().getInt(
-        "operations.reconciliation-interval-minutes", 1440);
     if (reconciliationIntervalMinutes > 0) {
       maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
           database.writer(), () -> {
@@ -276,6 +275,7 @@ public final class ExchangeRuntimeFactory {
     }
     uiMaintenance.scheduleWithFixedDelay(marketData::publishPlayerUpdates,
         1L, 1L, TimeUnit.SECONDS);
+    applyOperationalSettings();
     final ScheduledExecutorService maintenanceForClose = maintenance;
     final ScheduledExecutorService uiMaintenanceForClose = uiMaintenance;
 
@@ -310,6 +310,7 @@ public final class ExchangeRuntimeFactory {
   public void reloadConfig() {
     Map<String, PersistentOrderService> liveMarkets = this.markets;
     MarketRegistry liveRegistry = this.registry;
+    ExchangeViewService liveViews = this.views;
     if (liveMarkets == null || liveRegistry == null) {
       throw new IllegalStateException("exchange runtime is not started");
     }
@@ -317,13 +318,31 @@ public final class ExchangeRuntimeFactory {
     File reloadMarkets = new File(addon.getDataFolder(), "markets.yml");
     MarketRegistry reloaded = MarketRegistry.load(reloadConfig, reloadMarkets);
     if (!liveMarkets.keySet().equals(reloaded.marketIds())) {
+      java.util.Set<String> added = new java.util.TreeSet<>(reloaded.marketIds());
+      added.removeAll(liveMarkets.keySet());
+      java.util.Set<String> removed = new java.util.TreeSet<>(liveMarkets.keySet());
+      removed.removeAll(reloaded.marketIds());
+      StringBuilder blocked = new StringBuilder("market set cannot change during a hot reload");
+      if (!added.isEmpty()) {
+        blocked.append("; add new markets while the server is stopped or use the admin"
+            + " create-market command instead: ").append(added);
+      }
+      if (!removed.isEmpty()) {
+        blocked.append("; remove markets while the server is stopped after pausing them and"
+            + " cancelling open orders: ").append(removed);
+      }
       throw new IllegalStateException(
-          "market set cannot change during reload; pause markets and restart to apply structural changes");
+          blocked.toString());
     }
+    java.util.List<String> allBlockers = new java.util.ArrayList<>();
     for (String marketId : liveMarkets.keySet()) {
       MarketDefinition current = liveRegistry.require(marketId);
       MarketDefinition next = reloaded.require(marketId);
-      requireReloadableStructure(current, next);
+      allBlockers.addAll(describeReloadBlockers(current, next));
+    }
+    if (!allBlockers.isEmpty()) {
+      throw new IllegalArgumentException(String.join("; ", allBlockers)
+          + ". Pause the affected markets, cancel their open orders, then retry /qse reload");
     }
     // The structure is unchanged, so the state reader is never consulted: reload only advances
     // risk/fee versions, persists them atomically and swaps the live definitions in one step.
@@ -335,6 +354,25 @@ public final class ExchangeRuntimeFactory {
       service.updateRiskLimits(limits(next), accountLimits(next.risk()));
     }
     this.registry = liveRegistry;
+    if (liveViews != null) {
+      long guiRefreshMs = Math.max(250L, addon.getConfig().getLong(
+          "market-data.gui-refresh-ms", 1000));
+      liveViews.updateRefreshInterval(java.time.Duration.ofMillis(guiRefreshMs));
+    }
+    applyOperationalSettings();
+  }
+
+  /**
+   * Hot-applies scheduler-backed settings so configuration changes do not require a restart. The
+   * settings are read from the already-reloaded Bukkit configuration; every scheduled task re-reads
+   * them on each tick, so the values take effect without rescheduling.
+   */
+  private void applyOperationalSettings() {
+    FileConfiguration config = addon.getConfig();
+    this.candleRetentionDays = Math.max(1, config.getInt(
+        "market-data.candle-retention-days", 365));
+    this.reconciliationIntervalMinutes = config.getInt(
+        "operations.reconciliation-interval-minutes", 1440);
   }
 
   /**
@@ -503,12 +541,78 @@ public final class ExchangeRuntimeFactory {
 
   static boolean requireReloadableStructure(
       MarketDefinition current, MarketDefinition next) {
-    if (!sameCustodyStructure(current, next) || feeRatesDiffer(current, next)) {
-      throw new IllegalArgumentException(
-          "structural or fee changes require a paused market with no open orders;"
-              + " apply them manually or restart the server");
+    java.util.List<String> blockers = describeReloadBlockers(current, next);
+    if (!blockers.isEmpty()) {
+      throw new IllegalArgumentException(String.join("; ", blockers)
+          + ". Pause the market, cancel its open orders, then retry /qse reload");
     }
     return true;
+  }
+
+  /**
+   * Explains exactly which fields changed for each market so the operator knows what prevents a
+   * hot reload. The returned list is intentionally empty for risk-only changes, which reload
+   * applies live without pausing the market.
+   */
+  static java.util.List<String> describeReloadBlockers(
+      MarketDefinition current, MarketDefinition next) {
+    java.util.List<String> blockers = new java.util.ArrayList<>();
+    if (current.assetType() != next.assetType()) {
+      blockers.add(current.marketId() + ": asset type changed from "
+          + current.assetType() + " to " + next.assetType());
+    }
+    if (!java.util.Objects.equals(current.item(), next.item())) {
+      blockers.add(current.marketId() + ": item definition changed");
+    }
+    if (!java.util.Objects.equals(current.security(), next.security())) {
+      blockers.add(current.marketId() + ": security metadata changed");
+    }
+    java.util.List<String> structural = structuralDiffs(current.structural(), next.structural());
+    for (String difference : structural) {
+      blockers.add(current.marketId() + ": " + difference);
+    }
+    if (feeRatesDiffer(current, next)) {
+      blockers.add(current.marketId() + ": maker/taker fee rates changed");
+    }
+    return java.util.List.copyOf(blockers);
+  }
+
+  private static java.util.List<String> structuralDiffs(
+      MarketDefinition.StructuralRules first, MarketDefinition.StructuralRules second) {
+    java.util.List<String> differences = new java.util.ArrayList<>();
+    if (!first.currencyId().equals(second.currencyId())) {
+      differences.add("currency changed from " + first.currencyId() + " to " + second.currencyId());
+    }
+    if (first.basePrice().compareTo(second.basePrice()) != 0) {
+      differences.add("base price changed from " + first.basePrice() + " to " + second.basePrice());
+    }
+    if (first.minPrice().compareTo(second.minPrice()) != 0) {
+      differences.add("min price changed from " + first.minPrice() + " to " + second.minPrice());
+    }
+    if (first.maxPrice().compareTo(second.maxPrice()) != 0) {
+      differences.add("max price changed from " + first.maxPrice() + " to " + second.maxPrice());
+    }
+    if (first.tickSize().compareTo(second.tickSize()) != 0) {
+      differences.add("tick size changed from " + first.tickSize() + " to " + second.tickSize());
+    }
+    if (first.priceScale() != second.priceScale()) {
+      differences.add("price scale changed from " + first.priceScale() + " to " + second.priceScale());
+    }
+    if (first.currencyScale() != second.currencyScale()) {
+      differences.add("currency scale changed from " + first.currencyScale() + " to "
+          + second.currencyScale());
+    }
+    if (first.minQuantity() != second.minQuantity()) {
+      differences.add("min quantity changed from " + first.minQuantity() + " to " + second.minQuantity());
+    }
+    if (first.maxQuantity() != second.maxQuantity()) {
+      differences.add("max quantity changed from " + first.maxQuantity() + " to " + second.maxQuantity());
+    }
+    if (first.discoveryQuantity() != second.discoveryQuantity()) {
+      differences.add("discovery quantity changed from " + first.discoveryQuantity() + " to "
+          + second.discoveryQuantity());
+    }
+    return differences;
   }
 
   private static boolean sameCustodyStructure(MarketDefinition first, MarketDefinition second) {
