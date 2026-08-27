@@ -116,6 +116,7 @@ public final class MySqlSingleWriterGuard implements SingleWriterGuard {
 
   private void checkConnection() {
     Runnable listener = null;
+    Throwable detected = null;
     fence.writeLock().lock();
     try {
       synchronized (this) {
@@ -126,12 +127,15 @@ public final class MySqlSingleWriterGuard implements SingleWriterGuard {
           if (connection.isValid(1) && !connection.isClosed()) {
             return;
           }
-        } catch (Exception ignored) {
-          // A failed health check has the same safety meaning as a disconnected lock session.
+        } catch (Throwable failure) {
+          // A failed health check has the same safety meaning as a disconnected lock session,
+          // but the failure must never escape the monitor task: ScheduledExecutorService drops
+          // a periodic task permanently after an uncaught exception.
+          detected = failure;
         }
         try {
           connection.close();
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
           // The connection is already unusable.
         }
         connection = null;
@@ -139,13 +143,25 @@ public final class MySqlSingleWriterGuard implements SingleWriterGuard {
           listener = onLockLost;
         }
       }
+    } catch (Throwable failure) {
+      LOGGER.log(java.util.logging.Level.SEVERE,
+          "Exchange writer-lock health monitor failed", failure);
+      return;
     } finally {
       fence.writeLock().unlock();
+    }
+    if (detected != null) {
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "Exchange writer-lock connection became unusable; the runtime will fence writes"
+              + " and recovery is handled by the next startup.", detected);
     }
     if (listener != null) {
       listener.run();
     }
   }
+
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.WriterLock");
 
   @FunctionalInterface
   public interface ConnectionFactory {

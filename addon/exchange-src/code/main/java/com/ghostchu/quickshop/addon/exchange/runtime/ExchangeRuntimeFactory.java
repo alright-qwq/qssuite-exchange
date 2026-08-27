@@ -68,6 +68,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /** Production composition root for the exchange's recoverable single-writer runtime. */
 public final class ExchangeRuntimeFactory {
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.RuntimeFactory");
   private final JavaPlugin addon;
   private final QuickShop quickShop;
   private volatile Database database;
@@ -932,8 +934,10 @@ public final class ExchangeRuntimeFactory {
         }
         return null;
       }));
-    } catch (Exception ignored) {
+    } catch (Exception failure) {
       // A later maintenance tick retries; CAS versioning prevents stale automatic reopen.
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "Exchange automatic market reopen scan failed", failure);
     }
   }
 
