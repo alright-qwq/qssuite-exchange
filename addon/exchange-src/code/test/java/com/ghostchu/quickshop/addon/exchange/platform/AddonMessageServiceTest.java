@@ -44,5 +44,7 @@ class AddonMessageServiceTest {
         .isEqualTo("你下单太频繁了，请稍等片刻再试。");
     assertThat(messages.message("ui-reject-market-not-open", Locale.US))
         .isEqualTo("This market is not accepting new orders right now.");
+    assertThat(messages.message("review-required", Locale.forLanguageTag("zh-CN")))
+        .isEqualTo("此转账需要管理员审核，系统不会自动重试。");
   }
 }

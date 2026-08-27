@@ -233,7 +233,7 @@ en-US:
   ui-reject-fallback: 'Request rejected: <0>'
   ui-confirm-back-market: Back to market
   ui-admin-market: Market controls
-  ui-admin-market-usage: '/qse admin market pause <market> <reason>'
+  ui-admin-market-usage: '/qse admin market pause|resume <market> <reason>'
   ui-admin-orders: Order controls
   ui-admin-orders-usage: '/qse admin order cancel <order-id> <reason>'
   ui-admin-recovery: Recovery controls
@@ -477,7 +477,7 @@ zh-CN:
   ui-reject-fallback: '请求被拒绝：<0>'
   ui-confirm-back-market: 返回市场
   ui-admin-market: 市场控制
-  ui-admin-market-usage: '/qse admin market pause <市场> <原因>'
+  ui-admin-market-usage: '/qse admin market pause|resume <市场> <原因>'
   ui-admin-orders: 订单控制
   ui-admin-orders-usage: '/qse admin order cancel <订单ID> <原因>'
   ui-admin-recovery: 恢复控制

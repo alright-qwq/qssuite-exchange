@@ -361,8 +361,13 @@ final class RequestSummaryPage {
             onlinePlayer.sendMessage(messages.component(onlinePlayer,
                 "ui-confirm-submit-accepted", result.reference()));
           } else if (result.outcome() == ExchangeRequestSubmitter.Outcome.REVIEW_REQUIRED) {
-            onlinePlayer.sendMessage(messages.component(onlinePlayer,
-                "ui-confirm-submit-review", result.reference(), reason));
+            if ("INVENTORY_FULL".equals(result.reason())) {
+              onlinePlayer.sendMessage(messages.component(onlinePlayer, "inventory-full"));
+            } else {
+              onlinePlayer.sendMessage(messages.component(onlinePlayer,
+                  "ui-confirm-submit-review", result.reference(), reason));
+              onlinePlayer.sendMessage(messages.component(onlinePlayer, "review-required"));
+            }
           } else if (result.outcome() == ExchangeRequestSubmitter.Outcome.REJECTED) {
             onlinePlayer.sendMessage(messages.component(onlinePlayer,
                 reason.isEmpty() ? "ui-confirm-submit-rejected-no-reason"

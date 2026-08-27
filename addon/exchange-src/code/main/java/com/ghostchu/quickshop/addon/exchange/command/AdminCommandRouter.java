@@ -213,9 +213,8 @@ public final class AdminCommandRouter {
       }
       if (args.length == 3 && "ack".equalsIgnoreCase(args[1])) {
         UUID alertId = UUID.fromString(args[2]);
-        executeWrite(actor, () -> {
-          administration.acknowledgeAlert(actor.accountId(), alertId);
-        });
+        executeWrite(actor, () -> administration.acknowledgeAlert(actor.accountId(), alertId),
+            "admin-audit-acknowledged");
         return;
       }
       if (args.length == 4 && "export".equalsIgnoreCase(args[1])) {
@@ -397,9 +396,15 @@ public final class AdminCommandRouter {
   }
 
   private void executeWrite(CommandActor actor, CheckedWork work) {
+    executeWrite(actor, work, null);
+  }
+
+  private void executeWrite(CommandActor actor, CheckedWork work, String successKey) {
     try {
       boolean completed = writes.execute(work);
-      actor.message(completed ? "request-accepted" : "admin-command-failed");
+      actor.message(completed
+          ? (successKey == null ? "request-accepted" : successKey)
+          : "admin-command-failed");
     } catch (IllegalArgumentException invalid) {
       actor.message("admin-command-invalid");
     } catch (Exception failure) {

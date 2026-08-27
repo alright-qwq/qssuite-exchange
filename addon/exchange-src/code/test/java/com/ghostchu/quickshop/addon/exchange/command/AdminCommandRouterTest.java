@@ -222,7 +222,7 @@ class AdminCommandRouterTest {
 
     router.execute(actor, new String[] {"audit", "ack", alert.alertId().toString()});
 
-    assertThat(actor.message).isEqualTo("request-accepted");
+    assertThat(actor.message).isEqualTo("admin-audit-acknowledged");
     assertThat(writes).hasValue(1);
     assertThat(fixture.repository().openAlerts(10)).isEmpty();
   }

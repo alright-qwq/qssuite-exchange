@@ -3,6 +3,9 @@ package com.ghostchu.quickshop.addon.exchange.runtime;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderSide;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderType;
+import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
+import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferStatus;
+import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferType;
 import com.ghostchu.quickshop.addon.exchange.ui.ExchangeRequestSubmitter;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -184,6 +187,41 @@ class ExchangeRuntimeTest {
     assertThat(RuntimeExchangeRequestSubmitter.rejectionReason(
         new IllegalStateException("database locked")))
         .isNull();
+  }
+
+  @Test
+  void mapsPreparedWithdrawalsToReviewRequiredWithInventoryHint() {
+    UUID requestId = UUID.randomUUID();
+    UUID transferId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    TransferRecord prepared = new TransferRecord(transferId, requestId, accountId,
+        TransferType.ITEM_WITHDRAWAL, "diamond-usd", new BigDecimal("1"), TransferStatus.PREPARED,
+        "marker", null, java.time.Instant.now(), java.time.Instant.now(), 0);
+
+    ExchangeRequestSubmitter.SubmissionResult result =
+        RuntimeExchangeRequestSubmitter.resultForTransfer(requestId, prepared);
+
+    assertThat(result.outcome()).isEqualTo(ExchangeRequestSubmitter.Outcome.REVIEW_REQUIRED);
+    assertThat(result.reference()).isEqualTo(transferId.toString());
+    assertThat(result.reason()).isEqualTo("INVENTORY_FULL");
+  }
+
+  @Test
+  void mapsFailedAndCompletedTransfersToRejectedAndAccepted() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    var now = java.time.Instant.now();
+    TransferRecord failed = new TransferRecord(UUID.randomUUID(), requestId, accountId,
+        TransferType.MONEY_DEPOSIT, "vault", new BigDecimal("1"), TransferStatus.FAILED,
+        "economy withdrawal rejected", "economy withdrawal rejected", now, now, 0);
+    TransferRecord completed = new TransferRecord(UUID.randomUUID(), requestId, accountId,
+        TransferType.MONEY_DEPOSIT, "vault", new BigDecimal("1"), TransferStatus.COMPLETED,
+        "ok", null, now, now, 0);
+
+    assertThat(RuntimeExchangeRequestSubmitter.resultForTransfer(requestId, failed).outcome())
+        .isEqualTo(ExchangeRequestSubmitter.Outcome.REJECTED);
+    assertThat(RuntimeExchangeRequestSubmitter.resultForTransfer(requestId, completed).outcome())
+        .isEqualTo(ExchangeRequestSubmitter.Outcome.ACCEPTED);
   }
 
   @Test

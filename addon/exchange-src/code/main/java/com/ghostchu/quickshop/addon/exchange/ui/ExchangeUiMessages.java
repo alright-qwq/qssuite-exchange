@@ -59,6 +59,7 @@ final class ExchangeUiMessages {
       case "FROZEN_LIMIT" -> "ui-reject-frozen-limit";
       case "OPEN_ORDER_LIMIT" -> "ui-reject-open-order-limit";
       case "SELF_TRADE" -> "ui-reject-self-trade";
+      case "INVENTORY_FULL" -> "inventory-full";
       default -> null;
     };
     if (key != null) {

@@ -6,6 +6,7 @@ import com.ghostchu.quickshop.addon.exchange.service.OrderReceipt;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferStatus;
 import com.ghostchu.quickshop.addon.exchange.ui.ExchangeRequestSubmitter;
+import java.util.UUID;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -102,13 +103,24 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
           if (completed.isEmpty()) {
             return unavailable(request);
           }
-          TransferRecord transfer = completed.orElseThrow();
-          Outcome outcome = transfer.status() == TransferStatus.REVIEW_REQUIRED
-              ? Outcome.REVIEW_REQUIRED : transfer.status() == TransferStatus.FAILED
-              ? Outcome.REJECTED : Outcome.ACCEPTED;
-          return new SubmissionResult(request.requestId(), outcome,
-              transfer.transferId().toString(), transfer.failureReason());
+          return resultForTransfer(request.requestId(), completed.orElseThrow());
         });
+  }
+
+  static SubmissionResult resultForTransfer(UUID requestId, TransferRecord transfer) {
+    if (transfer.status() == TransferStatus.PREPARED) {
+      // The withdrawal was prepared but could not be delivered yet (e.g. the player's
+      // inventory has no space); the transfer stays ready to claim. Surface this as a
+      // review-style outcome so the player is told to free inventory instead of seeing
+      // a plain "accepted" that implies the item arrived.
+      return new SubmissionResult(requestId, Outcome.REVIEW_REQUIRED,
+          transfer.transferId().toString(), "INVENTORY_FULL");
+    }
+    Outcome outcome = transfer.status() == TransferStatus.REVIEW_REQUIRED
+        ? Outcome.REVIEW_REQUIRED : transfer.status() == TransferStatus.FAILED
+        ? Outcome.REJECTED : Outcome.ACCEPTED;
+    return new SubmissionResult(requestId, outcome,
+        transfer.transferId().toString(), transfer.failureReason());
   }
 
   private static SubmissionResult unavailable(ExchangeMenuRequest request) {
