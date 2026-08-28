@@ -109,6 +109,51 @@ class MarketRegistryTest {
   }
 
   @Test
+  void rejectsBasePriceOutsideMarketBounds() {
+    assertThatThrownBy(() -> withStructuralBounds(new BigDecimal("20000.00"),
+        BigDecimal.ONE, new BigDecimal("10000.00")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("basePrice must be within market price bounds");
+  }
+
+  @Test
+  void rejectsBasePriceBeyondPriceScale() {
+    assertThatThrownBy(() -> withStructuralBounds(new BigDecimal("100.001"),
+        BigDecimal.ONE, new BigDecimal("10000.00")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("priceScale");
+  }
+
+  @Test
+  void rejectsEqualPriceBounds() {
+    assertThatThrownBy(() -> withStructuralBounds(new BigDecimal("1.00"),
+        BigDecimal.ONE, BigDecimal.ONE))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("invalid structural market rules");
+  }
+
+  @Test
+  void rejectsFeeRatesAboveOneHundredPercent() {
+    assertThatThrownBy(() -> withFeeRates("1.50", "0.002"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("fee rates must not exceed 100%");
+  }
+
+  @Test
+  void rejectsPriceCageRatioAtOrAboveOne() {
+    assertThatThrownBy(() -> withRisk(definition("0.01"), new BigDecimal("1.00")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("price cage and halt move ratios must be below 1");
+  }
+
+  @Test
+  void rejectsHaltMoveRatioAtOrAboveOne() {
+    assertThatThrownBy(() -> withLevelTwoMove(definition("0.01"), new BigDecimal("1.00")))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("price cage and halt move ratios must be below 1");
+  }
+
+  @Test
   void doesNotPublishAnyCandidateWhenAtomicPersistenceFails() {
     MarketRegistry registry = new MarketRegistry(Map.of(
         "diamond", definition("diamond", "0.01", "0.001", "0.002", 2),
@@ -291,6 +336,50 @@ class MarketRegistryTest {
             risk.levelTwoHaltSeconds(), risk.maxAccountHolding(), risk.maxFrozenCurrency(),
             risk.maxOpenOrders(), risk.operationsPerSecond(), risk.operationsPerMinute()),
         definition.blockContainerShops(), definition.assetType(), definition.security());
+  }
+
+  private static MarketDefinition withLevelTwoMove(MarketDefinition definition, BigDecimal levelTwoMove) {
+    MarketDefinition.RiskRules risk = definition.risk();
+    return new MarketDefinition(definition.marketId(), definition.displayName(),
+        definition.enabled(), definition.item(), definition.structural(),
+        new MarketDefinition.RiskRules(risk.makerFeeRate(), risk.takerFeeRate(),
+            risk.priceCageRatio(), risk.defaultMarketSlippage(), risk.maximumMarketSlippage(),
+            risk.levelOneMove(), risk.levelOneHaltSeconds(), levelTwoMove,
+            risk.levelTwoHaltSeconds(), risk.maxAccountHolding(), risk.maxFrozenCurrency(),
+            risk.maxOpenOrders(), risk.operationsPerSecond(), risk.operationsPerMinute()),
+        definition.blockContainerShops(), definition.assetType(), definition.security());
+  }
+
+  private static MarketDefinition withFeeRates(String makerFeeRate, String takerFeeRate) {
+    return new MarketDefinition("minecraft_diamond/default", "Diamond", false,
+        new MarketDefinition.ItemDefinition(FingerprintMode.VANILLA_MATERIAL, "DIAMOND", null, null),
+        defaultStructuralRules(),
+        new MarketDefinition.RiskRules(new BigDecimal(makerFeeRate), new BigDecimal(takerFeeRate),
+            new BigDecimal("0.20"), new BigDecimal("0.05"), new BigDecimal("0.20"),
+            new BigDecimal("0.10"), 120, new BigDecimal("0.20"), 600, 100000,
+            new BigDecimal("10000000.00"), 100, 5, 60), false);
+  }
+
+  private static MarketDefinition withStructuralBounds(
+      BigDecimal basePrice, BigDecimal minPrice, BigDecimal maxPrice) {
+    return new MarketDefinition("minecraft_diamond/default", "Diamond", false,
+        new MarketDefinition.ItemDefinition(FingerprintMode.VANILLA_MATERIAL, "DIAMOND", null, null),
+        new MarketDefinition.StructuralRules("default", basePrice, minPrice, maxPrice,
+            new BigDecimal("0.01"), 2, 2, 1, 2304, 100),
+        defaultRiskRules(), false);
+  }
+
+  private static MarketDefinition.StructuralRules defaultStructuralRules() {
+    return new MarketDefinition.StructuralRules("default", new BigDecimal("100.00"),
+        BigDecimal.ONE, new BigDecimal("10000.00"), new BigDecimal("0.01"), 2, 2,
+        1, 2304, 100);
+  }
+
+  private static MarketDefinition.RiskRules defaultRiskRules() {
+    return new MarketDefinition.RiskRules(new BigDecimal("0.001"), new BigDecimal("0.002"),
+        new BigDecimal("0.20"), new BigDecimal("0.05"), new BigDecimal("0.20"),
+        new BigDecimal("0.10"), 120, new BigDecimal("0.20"), 600, 100000,
+        new BigDecimal("10000000.00"), 100, 5, 60);
   }
 
   private static MarketDefinition definition(String tickSize) {

@@ -63,13 +63,19 @@ public record MarketDefinition(
       requirePositive(minPrice, "minPrice");
       requirePositive(maxPrice, "maxPrice");
       requirePositive(tickSize, "tickSize");
-      if (minPrice.compareTo(maxPrice) > 0 || priceScale < 0 || currencyScale < 0
+      if (minPrice.compareTo(maxPrice) >= 0 || priceScale < 0 || currencyScale < 0
           || minQuantity <= 0 || maxQuantity < minQuantity || discoveryQuantity < minQuantity * 10) {
         throw new IllegalArgumentException("invalid structural market rules");
       }
-      if (!fitsScale(tickSize, priceScale) || !fitsScale(minPrice, priceScale)
-          || !fitsScale(maxPrice, priceScale)) {
+      if (!fitsScale(basePrice, priceScale) || !fitsScale(tickSize, priceScale)
+          || !fitsScale(minPrice, priceScale) || !fitsScale(maxPrice, priceScale)) {
         throw new IllegalArgumentException("tick and price bounds must fit priceScale");
+      }
+      validateTickAlignment(basePrice, tickSize, "basePrice");
+      validateTickAlignment(minPrice, tickSize, "minPrice");
+      validateTickAlignment(maxPrice, tickSize, "maxPrice");
+      if (basePrice.compareTo(minPrice) < 0 || basePrice.compareTo(maxPrice) > 0) {
+        throw new IllegalArgumentException("basePrice must be within market price bounds");
       }
     }
   }
@@ -90,6 +96,15 @@ public record MarketDefinition(
       requireNonNegative(levelOneMove, "levelOneMove");
       requireNonNegative(levelTwoMove, "levelTwoMove");
       requirePositive(maxFrozenCurrency, "maxFrozenCurrency");
+      if (makerFeeRate.compareTo(BigDecimal.ONE) > 0
+          || takerFeeRate.compareTo(BigDecimal.ONE) > 0) {
+        throw new IllegalArgumentException("fee rates must not exceed 100%");
+      }
+      if (priceCageRatio.compareTo(BigDecimal.ONE) >= 0
+          || levelOneMove.compareTo(BigDecimal.ONE) >= 0
+          || levelTwoMove.compareTo(BigDecimal.ONE) >= 0) {
+        throw new IllegalArgumentException("price cage and halt move ratios must be below 1");
+      }
       if (defaultMarketSlippage.compareTo(maximumMarketSlippage) > 0
           || maximumMarketSlippage.compareTo(new BigDecimal("0.20")) > 0
           || levelOneHaltSeconds <= 0 || levelTwoHaltSeconds <= 0 || maxAccountHolding <= 0
@@ -123,5 +138,12 @@ public record MarketDefinition(
 
   private static boolean fitsScale(BigDecimal value, int scale) {
     return value.stripTrailingZeros().scale() <= scale;
+  }
+
+  private static void validateTickAlignment(BigDecimal price, BigDecimal tickSize, String name) {
+    BigDecimal ticks = price.divide(tickSize, 0, java.math.RoundingMode.DOWN);
+    if (ticks.multiply(tickSize).compareTo(price) != 0) {
+      throw new IllegalArgumentException(name + " is not aligned to tickSize");
+    }
   }
 }
