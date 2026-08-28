@@ -97,7 +97,7 @@ public final class AdminCommandRouter {
     }
     try {
       String action = args[1].toLowerCase(java.util.Locale.ROOT);
-      if (args.length >= 9 && "create".equals(action)) {
+      if (args.length >= 7 && "create".equals(action)) {
         String symbol = args[2];
         String name = args[3];
         String currency = args[4];

@@ -64,6 +64,7 @@
 ```text
 /qse admin stock create <symbol> <name> <currency> <basePrice> <totalSupply> [minimumUnit] [description...]
 /qse admin stock issue <marketId|symbol> <playerUUID> <quantity> <reason...>
+/qse admin stock transfer <marketId|symbol> <fromUUID> <toUUID> <quantity> <reason...>
 /qse admin stock pause <marketId|symbol> <reason...>
 /qse admin stock resume <marketId|symbol> <reason...>
 /qse admin stock close <marketId|symbol> <recoveryAccountUUID> <reason...>
@@ -75,6 +76,7 @@
 
 - `OPEN`：接受新订单。
 - `PAUSED`：仍然可以发行，但由于撮合市场状态在同一事务中被暂停，下单被停止。证券状态和市场状态会自动保持同步。
+- `transfer`：把证券余额从一个账户转移到另一个账户（仅限 `OPEN` 或 `PAUSED`，数量必须是最小单位的整数倍），写入审计记录。
 - `HALTED`：保留给熔断式停牌（尚未接入自动市场停牌）。
 - `CLOSED`：不能再发行；`close` 要求零未成交订单，会把所有未结余额转移到恢复账户，然后把定义标记为关闭。
 

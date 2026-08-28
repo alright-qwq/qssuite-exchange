@@ -154,6 +154,25 @@ class ExchangeCommandRouterTest {
   }
 
   @Test
+  void parsesChineseOrderSideAliasesIntoTheSameOrders() {
+    UUID request = UUID.randomUUID();
+    Actor actor = new Actor("quickshop.exchange.use", "quickshop.exchange.order.limit");
+    ExchangeCommandRouter router = new ExchangeCommandRouter(() -> request);
+
+    router.execute(actor, new String[] {"order", "limit", "买入", "diamond-usd", "100.00", "5"});
+    assertThat(actor.opened.order().side()).isEqualTo(OrderSide.BUY);
+
+    router.execute(actor, new String[] {"order", "limit", "卖出", "diamond-usd", "100.00", "5"});
+    assertThat(actor.opened.order().side()).isEqualTo(OrderSide.SELL);
+
+    router.execute(actor, new String[] {"order", "limit", "买", "diamond-usd", "100.00", "5"});
+    assertThat(actor.opened.order().side()).isEqualTo(OrderSide.BUY);
+
+    router.execute(actor, new String[] {"order", "limit", "卖", "diamond-usd", "100.00", "5"});
+    assertThat(actor.opened.order().side()).isEqualTo(OrderSide.SELL);
+  }
+
+  @Test
   void parsesMoneyDepositIntoAContext() {
     UUID request = UUID.randomUUID();
     Actor actor = new Actor("quickshop.exchange.use", "quickshop.exchange.deposit");

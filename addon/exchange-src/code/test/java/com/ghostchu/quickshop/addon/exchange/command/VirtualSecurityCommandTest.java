@@ -32,6 +32,21 @@ class VirtualSecurityCommandTest {
   }
 
   @Test
+  void createsStockWithDefaultMinimumUnitAndDescription() throws Exception {
+    Fixture fixture = new Fixture();
+    Actor actor = new Actor("quickshop.exchange.admin.stock");
+
+    fixture.router.execute(actor, new String[] {"stock", "create", "BETA", "Beta",
+        "default", "10.00", "1000"});
+    assertThat(actor.message).isEqualTo("request-accepted");
+
+    var definition = fixture.repository.inTransaction(
+        tx -> tx.securityDefinition("beta"));
+    assertThat(definition.minimumUnit()).isEqualTo(1);
+    assertThat(definition.description()).isEqualTo("Beta");
+  }
+
+  @Test
   void deniesStockCommandsWithoutDedicatedPermission() throws Exception {
     Fixture fixture = new Fixture();
     Actor actor = new Actor("quickshop.exchange.admin.market");

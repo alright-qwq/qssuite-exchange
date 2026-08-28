@@ -280,8 +280,8 @@ public final class ExchangeCommandRouter {
 
   private static OrderSide parseSide(String raw) {
     return switch (raw.toLowerCase(java.util.Locale.ROOT)) {
-      case "buy" -> OrderSide.BUY;
-      case "sell" -> OrderSide.SELL;
+      case "buy", "买", "买入" -> OrderSide.BUY;
+      case "sell", "卖", "卖出" -> OrderSide.SELL;
       default -> throw new IllegalArgumentException("unknown order side");
     };
   }
@@ -340,7 +340,7 @@ public final class ExchangeCommandRouter {
       }
       return switch (args[0].toLowerCase(java.util.Locale.ROOT)) {
         case "order" -> args.length == 2 ? List.of("limit", "market")
-            : args.length == 3 ? List.of("buy", "sell") : List.of();
+            : args.length == 3 ? List.of("buy", "sell", "买", "卖") : List.of();
         case "stock" -> args.length == 2 ? prefixMatches(symbolCandidates.get(), args[1]) : List.of();
         case "deposit", "withdraw" -> args.length == 2 ? List.of("money", "item") : List.of();
         case "admin" -> args.length == 2 ? List.of("market", "order", "transfer", "audit", "stock")
