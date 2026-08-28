@@ -60,6 +60,35 @@ class FoliaInventoryGatewayTest {
   }
 
   @Test
+  void lateEntityTaskAfterTimeoutDoesNotMutateInventory() {
+    PlayerMock player = server.addPlayer();
+    NamespacedKey marker = new NamespacedKey("exchange", "transfer");
+    AtomicInteger schedulerCalls = new AtomicInteger();
+    Runnable[] deferred = new Runnable[1];
+    FoliaInventoryGateway gateway = new FoliaInventoryGateway(
+        playerId -> playerId.equals(player.getUniqueId()) ? player : null,
+        (scheduledPlayer, task) -> {
+          schedulerCalls.incrementAndGet();
+          deferred[0] = task;
+        },
+        ItemStack::isSimilar,
+        FoliaInventoryGatewayTest::encode,
+        marker);
+    gateway.updateTimeout(java.time.Duration.ofMillis(100));
+    UUID transferId = UUID.randomUUID();
+    player.getInventory().setItem(0, new ItemStack(Material.DIAMOND, 64));
+
+    InventoryResult result = gateway.markForDeposit(
+        player.getUniqueId(), new ItemStack(Material.DIAMOND), 32, transferId).join();
+
+    assertThat(result).isEqualTo(InventoryResult.OFFLINE);
+    assertThat(deferred[0]).isNotNull();
+    deferred[0].run();
+    assertThat(player.getInventory().getItem(0).getAmount()).isEqualTo(64);
+    assertThat(markedQuantity(player, marker, transferId)).isZero();
+  }
+
+  @Test
   void fullInventoryDoesNotReceivePartialMarkedDelivery() {
     GatewayFixture fixture = onlineFixture();
     for (int slot = 0; slot < fixture.player().getInventory().getStorageContents().length; slot++) {

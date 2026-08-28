@@ -89,6 +89,9 @@ public final class ExchangeRuntimeFactory {
   private volatile org.bukkit.event.Listener containerShopListener;
   private volatile org.bukkit.event.Listener transferLoginListener;
   private final Object lifecycleLock;
+  private AutoCloseable startupPlayerOperations;
+  private AutoCloseable startupRecoveryExecutor;
+  private AutoCloseable startupRecoveryFenceExecutor;
 
   public ExchangeRuntimeFactory(JavaPlugin addon, QuickShop quickShop) {
     this(addon, quickShop, null);
@@ -162,6 +165,7 @@ public final class ExchangeRuntimeFactory {
     this.markets = java.util.Map.copyOf(markets);
 
     PlayerOperationSerialiser playerOperations = new PlayerOperationSerialiser();
+    startupPlayerOperations = playerOperations;
     NamespacedKey marker = new NamespacedKey(addon, "exchange-transfer");
     FoliaInventoryGateway inventory = new FoliaInventoryGateway(quickShop, marker);
     inventory.updateTimeout(inventoryAccessTimeout(addon.getConfig()));
@@ -178,8 +182,10 @@ public final class ExchangeRuntimeFactory {
     this.actions = actions;
     DrainingExecutor recoveryExecutor = new DrainingExecutor(
         "qs-exchange-recovery-", Duration.ofSeconds(30));
+    startupRecoveryExecutor = recoveryExecutor;
     DrainingExecutor recoveryFenceExecutor = new DrainingExecutor(
         "qs-exchange-recovery-fence-", Duration.ofSeconds(30));
+    startupRecoveryFenceExecutor = recoveryFenceExecutor;
     TransferRecoveryService transfers = new TransferRecoveryService(
         repository, repository, inventory, recoveryExecutor);
     ContainerShopPolicyListener containerShop = new ContainerShopPolicyListener(registry);
@@ -318,8 +324,26 @@ public final class ExchangeRuntimeFactory {
       if (uiMaintenance != null) {
         uiMaintenance.shutdownNow();
       }
+      closeBestEffort(startupPlayerOperations, startupRecoveryExecutor,
+          startupRecoveryFenceExecutor);
+      startupPlayerOperations = null;
+      startupRecoveryExecutor = null;
+      startupRecoveryFenceExecutor = null;
       database.writer().close();
       throw failure;
+    }
+  }
+
+  private static void closeBestEffort(AutoCloseable... closeables) {
+    for (AutoCloseable closeable : closeables) {
+      if (closeable == null) {
+        continue;
+      }
+      try {
+        closeable.close();
+      } catch (Exception ignored) {
+        // Startup is already failing; a close failure must not hide the original cause.
+      }
     }
   }
 

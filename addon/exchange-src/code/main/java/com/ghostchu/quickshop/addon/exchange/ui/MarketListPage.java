@@ -30,6 +30,18 @@ final class MarketListPage {
   private final java.util.Map<UUID, AssetFilter> assetFilters =
       new java.util.concurrent.ConcurrentHashMap<>();
 
+  /** Releases per-player preferences when the player leaves or the menu closes. */
+  void playerQuit(UUID playerId) {
+    sortModes.remove(playerId);
+    assetFilters.remove(playerId);
+  }
+
+  /** Releases all per-player preferences (menu shutdown). */
+  void playerQuitAll() {
+    sortModes.clear();
+    assetFilters.clear();
+  }
+
   MarketListPage(ExchangeViewService views, ExchangeMenuContextStore contexts,
                  AddonMessageService messages) {
     this.views = views;

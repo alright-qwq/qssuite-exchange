@@ -9,6 +9,8 @@ import net.tnemc.menu.core.PlayerInstancePage;
 public final class ExchangeMenu extends Menu {
   public static final String NAME = "qs:exchange";
   public static final String TITLE = "QuickShop Exchange";
+  private final MarketListPage marketListPage;
+  private final MarketDetailPage marketDetailPage;
 
   public ExchangeMenu(ExchangeViewService views, ExchangeMenuContextStore contexts,
                       ExchangeRequestSubmitter submitter, RolloutPolicy rollout,
@@ -22,10 +24,13 @@ public final class ExchangeMenu extends Menu {
     name = NAME;
     title = TITLE;
     rows = 6;
+    marketListPage = new MarketListPage(views, contexts, messages);
+    marketDetailPage = new MarketDetailPage(views, contexts, rollout, messages);
+    AssetsPage assetsPage = new AssetsPage(views, contexts, messages);
     addPage(page(ExchangeMenuPage.MARKETS,
-        new MarketListPage(views, contexts, messages)::open));
+        marketListPage::open));
     addPage(page(ExchangeMenuPage.MARKET_DETAIL,
-        new MarketDetailPage(views, contexts, rollout, messages)::open));
+        marketDetailPage::open));
     addPage(page(ExchangeMenuPage.ORDER_CONFIRM,
         new RequestSummaryPage(views, ExchangeMenuPage.ORDER_CONFIRM, contexts, submitter, rollout,
             messages)::open));
@@ -36,11 +41,17 @@ public final class ExchangeMenu extends Menu {
         new RequestSummaryPage(views, ExchangeMenuPage.TRANSFER_CONFIRM, contexts, submitter, rollout,
             messages)::open));
     addPage(page(ExchangeMenuPage.ORDERS, new MyOrdersPage(views, contexts, messages)::open));
-    addPage(page(ExchangeMenuPage.ASSETS, new AssetsPage(views, contexts, messages)::open));
+    addPage(page(ExchangeMenuPage.ASSETS, assetsPage::open));
     addPage(page(ExchangeMenuPage.HISTORY, new HistoryPage(views, contexts, messages)::open));
     addPage(page(ExchangeMenuPage.ADMIN, new AdminPage(messages, admin)::open));
     addPage(page(ExchangeMenuPage.MARKET_TRADES,
         new MarketTradesPage(views, contexts, messages)::open));
+  }
+
+  /** Releases per-player UI preferences when the menu is shut down. */
+  void clearPlayerPreferences() {
+    marketListPage.playerQuitAll();
+    marketDetailPage.playerQuitAll();
   }
 
   private static PlayerInstancePage page(ExchangeMenuPage target,

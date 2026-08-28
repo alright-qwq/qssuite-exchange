@@ -84,14 +84,44 @@ class TransferRecoveryServiceTest {
   }
 
   @org.junit.jupiter.api.Test
-  void leavesPreparedItemWithdrawalForLaterClaim() throws Exception {
+  void failsPreparedItemWithdrawalAndReleasesFrozenItems() throws Exception {
     try (Fixture fixture = Fixture.prepared(TransferType.ITEM_WITHDRAWAL, true)) {
       TransferRecord recovered = fixture.recovery().recover(fixture.transfer()).join();
 
-      assertThat(recovered.status()).isEqualTo(TransferStatus.PREPARED);
+      assertThat(recovered.status()).isEqualTo(TransferStatus.FAILED);
+      assertThat(recovered.failureReason()).contains("interrupted before processing");
+      var after = fixture.repository().inTransaction(transaction ->
+          transaction.inventory(fixture.account(), "diamond-usd"));
+      assertThat(after.frozenQuantity()).isZero();
+      assertThat(after.availableQuantity()).isEqualTo(2);
+    }
+  }
+
+  @org.junit.jupiter.api.Test
+  void marksPreparedItemWithdrawalReviewWhenItemsWereAlreadyDelivered() throws Exception {
+    try (Fixture fixture = Fixture.prepared(TransferType.ITEM_WITHDRAWAL, true)) {
+      fixture.gateway().markedQuantity = 2;
+
+      TransferRecord recovered = fixture.recovery().recover(fixture.transfer()).join();
+
+      assertThat(recovered.status()).isEqualTo(TransferStatus.REVIEW_REQUIRED);
+      assertThat(recovered.failureReason()).contains("marker is uncertain");
       var after = fixture.repository().inTransaction(transaction ->
           transaction.inventory(fixture.account(), "diamond-usd"));
       assertThat(after.frozenQuantity()).isEqualTo(2);
+    }
+  }
+
+  @org.junit.jupiter.api.Test
+  void failsPreparedItemDepositAndClearsResidualMarker() throws Exception {
+    try (Fixture fixture = Fixture.prepared(TransferType.ITEM_DEPOSIT, false)) {
+      fixture.gateway().markedQuantity = 2;
+
+      TransferRecord recovered = fixture.recovery().recover(fixture.transfer()).join();
+
+      assertThat(recovered.status()).isEqualTo(TransferStatus.FAILED);
+      assertThat(recovered.failureReason()).contains("interrupted before processing");
+      assertThat(fixture.gateway().markedQuantity).isZero();
     }
   }
 

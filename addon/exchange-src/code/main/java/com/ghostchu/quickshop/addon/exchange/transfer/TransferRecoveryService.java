@@ -111,10 +111,16 @@ public final class TransferRecoveryService {
       return transfer;
     }
     if (transfer.status() == TransferStatus.PREPARED) {
+      // The deposit never reached PROCESSING, so no custody balance was credited and the
+      // inventory marker is only a claim on the player's own stacks. Leaving the record
+      // unfinished would retry forever; fail it and clean any marker so the player can
+      // deposit again.
       if (markedQuantity(transfer) > 0) {
         clearMarker(transfer);
       }
-      return transfer;
+      return transfers.transition(transfer.transferId(), transfer.version(),
+          TransferStatus.PREPARED, TransferStatus.FAILED,
+          "interrupted before processing");
     }
     if (transfer.status() != TransferStatus.PROCESSING) {
       return transfer;
@@ -134,6 +140,27 @@ public final class TransferRecoveryService {
     if (transfer.status() == TransferStatus.COMPLETED) {
       clearMarker(transfer);
       return transfer;
+    }
+    if (transfer.status() == TransferStatus.PREPARED) {
+      long marked = markedQuantity(transfer);
+      if (marked > 0) {
+        // The server crashed after freezing custody but before delivering items; the marker
+        // is ambiguous and must be reviewed rather than guessed at.
+        return transfers.transition(transfer.transferId(), transfer.version(),
+            TransferStatus.PREPARED, TransferStatus.REVIEW_REQUIRED,
+            "interrupted item withdrawal marker is uncertain");
+      }
+      // No items were delivered, so unfreeze the custody balance and fail the transfer.
+      // Otherwise the frozen quantity would stay stranded forever because the transfer
+      // never advanced to PROCESSING.
+      return repository.inTransaction(transaction -> {
+        transaction.releaseItems(transfer.accountId(), transfer.assetId(),
+            transfer.amount().longValueExact());
+        transaction.appendJournal(
+            TransferJournals.releaseItemWithdrawal(transfer, transfer.updatedAt()));
+        return transaction.failPreparedTransfer(transfer.transferId(), transfer.version(),
+            "interrupted before processing");
+      });
     }
     if (transfer.status() != TransferStatus.PROCESSING) {
       return transfer;

@@ -42,6 +42,16 @@ final class MarketDetailPage {
   private final MarketDashboardPresenter presenter = new MarketDashboardPresenter();
   private final java.util.Map<UUID, Duration> timeframes = new java.util.concurrent.ConcurrentHashMap<>();
 
+  /** Releases per-player preferences when the player leaves or the menu closes. */
+  void playerQuit(UUID playerId) {
+    timeframes.remove(playerId);
+  }
+
+  /** Releases all per-player preferences (menu shutdown). */
+  void playerQuitAll() {
+    timeframes.clear();
+  }
+
   MarketDetailPage(ExchangeViewService views, ExchangeMenuContextStore contexts,
                    RolloutPolicy rollout, AddonMessageService messages) {
     this.views = views;

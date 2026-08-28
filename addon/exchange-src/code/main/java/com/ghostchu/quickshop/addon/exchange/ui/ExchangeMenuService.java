@@ -42,14 +42,15 @@ public final class ExchangeMenuService implements AutoCloseable {
     this.views = Objects.requireNonNull(views, "views");
     this.submitter = submitter;
     contexts = new ExchangeMenuContextStore(this.views::unsubscribeMarketUpdates);
+    menu = new ExchangeMenu(this.views, contexts, submitter,
+        Objects.requireNonNull(rollout, "rollout"), messages,
+        admin == null ? AdminAction.none() : admin);
     lifecycle = new ExchangeMenuLifecycle(contexts, playerId -> {
       ExchangeChatInputManager.getInstance().cancelInput(playerId);
       MenuManager.instance().removeViewer(playerId);
       this.views.unsubscribeMarketUpdates(playerId);
+      menu.clearPlayerPreferences();
     });
-    menu = new ExchangeMenu(this.views, contexts, submitter,
-        Objects.requireNonNull(rollout, "rollout"), messages,
-        admin == null ? AdminAction.none() : admin);
     MenuManager.instance().addMenu(menu);
   }
 
@@ -135,6 +136,7 @@ public final class ExchangeMenuService implements AutoCloseable {
       }
     }
     contexts.close();
+    menu.clearPlayerPreferences();
     // Viewers are per-player state; never stop or reset the global QuickShop menu manager.
   }
 }

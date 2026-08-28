@@ -240,9 +240,17 @@ public final class FoliaInventoryGateway implements InventoryGateway {
     }
     try {
       entityScheduler.accept(player, () -> {
+        if (future.isDone()) {
+          // The caller already observed the timeout (or another completion) and may have
+          // moved custody state forward. A late inventory mutation must never happen after
+          // that point, or items could be marked/removed/delivered a second time.
+          LOGGER.warning("Dropping late exchange inventory task for player " + playerId
+              + " after the caller already gave up waiting");
+          return;
+        }
         try {
           future.complete(player.isOnline() ? action.apply(player) : offlineResult);
-        } catch (RuntimeException failure) {
+        } catch (Throwable failure) {
           future.completeExceptionally(failure);
         }
       });
