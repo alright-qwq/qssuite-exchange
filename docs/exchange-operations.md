@@ -54,6 +54,7 @@
 /qse admin audit export <from> <to>
 /qse admin transfer review list
 /qse admin transfer review show <transferId>
+/qse admin transfer review cleanup <transferId>
 /qse admin transfer review resolve <transferId> <success|failure> <evidence>
 ```
 
@@ -64,6 +65,8 @@
 ## 应急处理
 
 强制撤单、市场状态变更、对账和转账审核请走受审计的管理路径。每次 `REVIEW_REQUIRED` 决议都要记录外部经济或库存证据。调查一笔转账时不要重复执行外部操作：持久化的划转记录才是事实来源。当持久化库存标记可能仍需要清理时，物品充值失败和物品取现成功都不能定稿。
+
+物品类审核在定稿前需要先清理玩家背包中的持久化标记：执行 `/qse admin transfer review cleanup <transferId>`（要求玩家在线，操作幂等且写入审计记录），清理成功后再用 `resolve` 定稿。
 
 应急关停时，先停止接受新的交易所请求，让 GUI 提交器、登录恢复围栏执行器、划转恢复执行器和玩家托管执行器在写入所有权释放前排空。最后一根 K 线的落盘严格在写入围栏内执行。如果任何排空或最终落盘失败，应将关停视为失败并保留写入锁。在 Folia 上，Exchange 库存通过每个玩家的实体调度器关闭；如果平台拒绝关停任务，插件不会回退到跨线程访问库存。备份时要把数据库和插件数据目录放在一起，保证 SQLite 锁和配置状态可审计。
 
