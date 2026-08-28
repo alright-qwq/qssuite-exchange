@@ -39,7 +39,7 @@ public final class AdminExchangeService {
   private final Map<String, PersistentOrderService> markets = new ConcurrentHashMap<>();
   private final ExchangeRepository repository;
   private final AuditExporter auditExporter;
-  private final Path auditDirectory;
+  private final java.util.concurrent.atomic.AtomicReference<Path> auditDirectory;
   private final SecurityService securities;
   private final InventoryGateway inventory;
   private final ExchangeMetrics metrics;
@@ -88,7 +88,7 @@ public final class AdminExchangeService {
     this.markets.putAll(Objects.requireNonNull(markets, "markets"));
     this.repository = repository;
     this.auditExporter = auditExporter;
-    this.auditDirectory = auditDirectory;
+    this.auditDirectory = new java.util.concurrent.atomic.AtomicReference<>(auditDirectory);
     this.securities = securities;
     this.inventory = inventory;
     this.metrics = metrics;
@@ -233,9 +233,17 @@ public final class AdminExchangeService {
     AuditExporter exporter = Objects.requireNonNull(
         auditExporter, "audit exporter is required for audit export");
     Path directory = Objects.requireNonNull(
-        auditDirectory, "audit directory is required for audit export");
+        auditDirectory.get(), "audit directory is required for audit export");
     return exporter.export(
         directory, store.auditRecords(fromInclusive, toExclusive), fromInclusive, toExclusive);
+  }
+
+  /**
+   * Hot-swaps the audit export directory. The path must already be validated against the addon
+   * data folder; the running service never recreates directories on its own.
+   */
+  public void updateAuditDirectory(Path directory) {
+    this.auditDirectory.set(Objects.requireNonNull(directory, "directory"));
   }
 
   public List<TransferRecord> pendingTransferReviews() throws SQLException {

@@ -356,6 +356,7 @@ public final class ExchangeRuntimeFactory {
       Map<String, PersistentOrderService> liveMarkets = this.markets;
       MarketRegistry liveRegistry = this.registry;
       ExchangeViewService liveViews = this.views;
+      AdminExchangeService liveAdministration = this.administration;
       if (liveMarkets == null || liveRegistry == null) {
         throw new IllegalStateException("exchange runtime is not started");
       }
@@ -373,6 +374,18 @@ public final class ExchangeRuntimeFactory {
             "exchange configuration is invalid; fix markets.yml/config.yml and retry /qse reload"
                 + " (previous settings are still active). Cause: " + configurationFailure.getMessage(),
             configurationFailure);
+      }
+      Path nextAuditDirectory;
+      try {
+        // Validate before any state is touched so an invalid export path never leaves the
+        // exchange half-reloaded; the directory swap itself is a pure, fail-free assignment.
+        nextAuditDirectory = requireAuditDirectory(addon.getDataFolder().toPath(),
+            addon.getConfig().getString("operations.audit-export-directory", "audit"));
+      } catch (IllegalArgumentException configurationFailure) {
+        throw new IllegalArgumentException(
+            "exchange configuration is invalid; fix config.yml and retry /qse reload"
+                + " (previous settings are still active). Cause: "
+                + configurationFailure.getMessage(), configurationFailure);
       }
       if (!liveMarkets.keySet().equals(reloaded.marketIds())) {
         java.util.Set<String> added = new java.util.TreeSet<>(reloaded.marketIds());
@@ -433,6 +446,9 @@ public final class ExchangeRuntimeFactory {
       FileConfiguration config = addon.getConfig();
       this.candleRetentionDays = Math.max(1, config.getInt(
           "market-data.candle-retention-days", 365));
+      if (liveAdministration != null) {
+        liveAdministration.updateAuditDirectory(nextAuditDirectory);
+      }
       int nextReconciliationInterval = config.getInt(
           "operations.reconciliation-interval-minutes", 1440);
       if (nextReconciliationInterval != this.reconciliationIntervalMinutes) {

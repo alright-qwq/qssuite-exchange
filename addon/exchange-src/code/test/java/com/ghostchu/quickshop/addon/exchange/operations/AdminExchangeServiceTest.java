@@ -250,6 +250,26 @@ class AdminExchangeServiceTest {
   }
 
   @Test
+  void hotSwappedAuditDirectoryRoutesLaterExportsToTheNewLocation() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    Path firstDirectory = Files.createTempDirectory("exchange-admin-audit-first-");
+    Path secondDirectory = Files.createTempDirectory("exchange-admin-audit-second-");
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository(),
+        new AuditExporter(), firstDirectory);
+    Instant from = Instant.now().minusSeconds(1);
+    admin.pauseMarket(UUID.randomUUID(), UUID.randomUUID(), fixture.rules().marketId(),
+        "scheduled maintenance");
+    Instant to = Instant.now().plusSeconds(1);
+
+    admin.updateAuditDirectory(secondDirectory);
+
+    Path exported = admin.exportAudit(from, to);
+    assertThat(exported).exists().isRegularFile().hasParent(secondDirectory.toAbsolutePath());
+    assertThat(exported.getParent()).isNotEqualTo(firstDirectory.toAbsolutePath());
+  }
+
+  @Test
   void pausesAffectedMarketAndAppendsAuditWhenReconciliationFindsACurrencyDifference()
       throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
