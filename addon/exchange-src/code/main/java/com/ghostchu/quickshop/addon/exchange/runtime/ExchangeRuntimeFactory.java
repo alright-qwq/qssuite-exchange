@@ -281,6 +281,10 @@ public final class ExchangeRuntimeFactory {
     };
     this.maintenance.scheduleWithFixedDelay(detectSuspiciousTrading, 2L, 5L, TimeUnit.MINUTES);
     this.maintenance.scheduleWithFixedDelay(resumeHalted, 1L, 1L, TimeUnit.MINUTES);
+    this.maintenance.scheduleWithFixedDelay(
+        () -> runWhileOwned(database.writer(),
+            () -> retryRecoveringMarkets(markets)),
+        1L, 1L, TimeUnit.MINUTES);
     this.maintenance.scheduleWithFixedDelay(() -> flushWhileOwned(
         database.writer(), marketData, Instant.now()), 1L, 1L, TimeUnit.MINUTES);
     this.candleRetentionDays = Math.max(1, addon.getConfig().getInt(
@@ -308,6 +312,8 @@ public final class ExchangeRuntimeFactory {
             recoveryExecutor.close();
             playerOperations.close();
             finalFlushWhileOwned(database.writer(), marketData, Instant.now());
+            closeMarketRuntimeStates(markets);
+            marketData.close();
           }, views, administration, actions);
       TransferLoginListener transferLogin = new TransferLoginListener(accountId ->
           runtime.callAsyncWhileWriting(() -> transfers.recoverPlayer(accountId),
@@ -329,6 +335,8 @@ public final class ExchangeRuntimeFactory {
       startupPlayerOperations = null;
       startupRecoveryExecutor = null;
       startupRecoveryFenceExecutor = null;
+      closeMarketRuntimeStates(markets);
+      closeBestEffort(marketData);
       database.writer().close();
       throw failure;
     }
@@ -1028,6 +1036,22 @@ public final class ExchangeRuntimeFactory {
       throws SQLException {
     for (PersistentOrderService market : markets.values()) {
       market.recoverFromDatabase();
+    }
+  }
+
+  private static void closeMarketRuntimeStates(Map<String, PersistentOrderService> markets) {
+    if (markets == null) {
+      return;
+    }
+    for (PersistentOrderService market : markets.values()) {
+      market.closeRuntimeState();
+    }
+  }
+
+  private static void retryRecoveringMarkets(Map<String, PersistentOrderService> markets)
+      throws SQLException {
+    for (PersistentOrderService market : markets.values()) {
+      market.recoverIfRecovering();
     }
   }
 

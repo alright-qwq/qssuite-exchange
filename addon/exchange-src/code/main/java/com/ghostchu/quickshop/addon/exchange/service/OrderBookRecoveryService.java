@@ -10,6 +10,7 @@ import com.ghostchu.quickshop.addon.exchange.core.risk.PriceSample;
 import com.ghostchu.quickshop.addon.exchange.core.risk.ReferencePriceTracker;
 import com.ghostchu.quickshop.addon.exchange.core.risk.RiskLimits;
 import com.ghostchu.quickshop.addon.exchange.core.risk.TradePermission;
+import com.ghostchu.quickshop.addon.exchange.operations.AuditRecord;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeRepository;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeTransaction;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeTransaction.MarketState;
@@ -28,6 +29,9 @@ import java.util.UUID;
 public final class OrderBookRecoveryService {
   static final long DISCOVERY_QUANTITY = 100;
   static final Duration REFERENCE_WINDOW = Duration.ofMinutes(5);
+  private static final java.util.UUID RECOVERY_ACTOR = new java.util.UUID(0L, 0L);
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.Recovery");
 
   private final ExchangeRepository repository;
   private final MarketRules rules;
@@ -43,13 +47,46 @@ public final class OrderBookRecoveryService {
   public RecoveredMarket recover(String marketId, Instant recoveredAt) throws SQLException {
     Objects.requireNonNull(recoveredAt, "recoveredAt");
     try {
-      return repository.inTransaction(tx -> {
+      RecoveredMarket recovered = repository.inTransaction(tx -> {
         MarketState state = tx.marketState(marketId);
         return recover(tx, state, recoveredAt);
       });
+      if (recovered.state().status() == MarketStatus.RECOVERING) {
+        reopenRecoveredMarket(marketId, recoveredAt);
+        recovered = repository.inTransaction(
+            tx -> recover(tx, tx.marketState(marketId), recoveredAt));
+      }
+      return recovered;
     } catch (SQLException | RuntimeException failure) {
       enterRecovery(marketId, failure);
       throw failure;
+    }
+  }
+
+  private void reopenRecoveredMarket(String marketId, Instant recoveredAt) {
+    try {
+      repository.inTransaction(tx -> {
+        MarketState state = tx.marketState(marketId);
+        if (state.status() != MarketStatus.RECOVERING) {
+          return null;
+        }
+        MarketState after = new MarketState(
+            state.marketId(), MarketStatus.OPEN, state.prioritySequence(), state.matchSequence(),
+            state.referencePrice(), state.lastPrice(), null, state.discoveryQuantity(),
+            state.circuitBreakerLevel(), Math.addExact(state.version(), 1));
+        tx.updateMarketState(after, state.version());
+        tx.appendAudit(new AuditRecord(
+            UUID.randomUUID(), RECOVERY_ACTOR, "RECOVERY_COMPLETED", marketId,
+            "recovered order book and reopened market", "status=RECOVERING", "status=OPEN",
+            recoveredAt));
+        return null;
+      });
+    } catch (SQLException | RuntimeException reopenFailure) {
+      // The next startup/recovery retry re-runs the same transition; CAS versioning
+      // prevents the reopening from overwriting newer state.
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "Exchange recovery reopened market " + marketId
+              + " but failed to persist the transition; it will retry", reopenFailure);
     }
   }
 

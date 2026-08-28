@@ -8,6 +8,7 @@ import com.ghostchu.quickshop.addon.exchange.core.model.OrderStatus;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderType;
 import com.ghostchu.quickshop.addon.exchange.core.model.TimeInForce;
 import com.ghostchu.quickshop.addon.exchange.core.risk.RiskLimits;
+import com.ghostchu.quickshop.addon.exchange.operations.AuditRecord;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeRepository;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeTransaction;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeTransaction.MarketState;
@@ -142,6 +143,27 @@ class OrderBookRecoveryServiceTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("sequence");
     assertThat(fixture.marketStatus()).isEqualTo("RECOVERING");
+  }
+
+  @Test
+  void successfulRecoveryReopensARecoveringMarketAndWritesAudit() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    UUID seller = fixture.accountWithItems(1);
+    fixture.service().place(limitSell(seller, 1));
+    fixture.setMarketStatus("RECOVERING");
+
+    RecoveredMarket recovered = fixture.recovery().recover("diamond-usd", Instant.now());
+
+    assertThat(recovered.state().status()).isEqualTo(MarketStatus.OPEN);
+    assertThat(fixture.marketStatus()).isEqualTo("OPEN");
+    assertThat(fixture.repository().auditRecords(Instant.EPOCH, Instant.now().plusSeconds(1)))
+        .extracting(AuditRecord::action)
+        .contains("RECOVERY_COMPLETED");
+    assertThat(fixture.repository().auditRecords(Instant.EPOCH, Instant.now().plusSeconds(1)))
+        .filteredOn(AuditRecord::action, "RECOVERY_COMPLETED")
+        .singleElement()
+        .extracting(AuditRecord::beforeState, AuditRecord::afterState)
+        .containsExactly("status=RECOVERING", "status=OPEN");
   }
 
   @Test

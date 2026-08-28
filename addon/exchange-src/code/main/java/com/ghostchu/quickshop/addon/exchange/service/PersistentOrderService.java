@@ -83,6 +83,7 @@ public final class PersistentOrderService {
   private final SettlementObserver observer;
   private final MarketDataService marketData;
   private volatile OrderBookRecoveryService marketRecovery;
+  private final MarketCoordinationKey coordinationKey;
   private final MarketRuntimeState runtimeState;
 
   public MarketRules marketRules() {
@@ -221,16 +222,21 @@ public final class PersistentOrderService {
         new ReservationCalculator(this.fees.get()));
     this.custody = Objects.requireNonNull(custody, "custody");
     this.marketRecovery = new OrderBookRecoveryService(repository, rules, this.riskLimits.get());
-    MarketCoordinationKey coordinationKey = new MarketCoordinationKey(
+    this.coordinationKey = new MarketCoordinationKey(
         Objects.requireNonNull(repository.coordinationKey(), "repository coordination key"),
         rules.marketId());
-    this.runtimeState = MARKET_RUNTIMES.computeIfAbsent(coordinationKey, ignored ->
+    this.runtimeState = MARKET_RUNTIMES.computeIfAbsent(this.coordinationKey, ignored ->
         new MarketRuntimeState(
             new OrderBook(),
             new ReferencePriceTracker(rules.basePrice(), REFERENCE_DISCOVERY_QUANTITY,
                 REFERENCE_WINDOW, rules.priceScale()),
             new CircuitBreaker(this.riskLimits.get()),
             Long.MIN_VALUE));
+  }
+
+  /** Removes this market's shared runtime state after the owning runtime is fully closed. */
+  public void closeRuntimeState() {
+    MARKET_RUNTIMES.remove(coordinationKey);
   }
 
   public OrderReceipt place(OrderRequest request) throws SQLException {
@@ -637,6 +643,17 @@ public final class PersistentOrderService {
       runtimeState.circuitBreaker = recovered.circuitBreaker().copy();
       runtimeState.committedMarketVersion = recovered.marketVersion();
     }
+  }
+
+  /** Rebuilds the order book only when the market is still in RECOVERING. */
+  public boolean recoverIfRecovering() throws SQLException {
+    MarketStatus status = repository.inTransaction(
+        tx -> tx.marketState(rules.marketId()).status());
+    if (status != MarketStatus.RECOVERING) {
+      return false;
+    }
+    recoverFromDatabase();
+    return true;
   }
 
   /** Builds a protected quote from the most recently committed book and reference-price state. */

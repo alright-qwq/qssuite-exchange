@@ -28,7 +28,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Builds read-only quotes from executed trades and their UTC-minute candles. */
-public final class MarketDataService {
+public final class MarketDataService implements AutoCloseable {
   private static final Duration TICKER_WINDOW = Duration.ofHours(24);
   private static final Logger LOGGER = Logger.getLogger(MarketDataService.class.getName());
   private final CandleAggregator candles;
@@ -93,6 +93,18 @@ public final class MarketDataService {
 
   public void unsubscribePlayer(UUID playerId) {
     playerConsumers.remove(Objects.requireNonNull(playerId, "playerId"));
+  }
+
+  /** Releases player subscriptions and per-market cache state when the runtime is torn down. */
+  @Override
+  public void close() {
+    playerConsumers.clear();
+    auditConsumers.clear();
+    changedMarkets.clear();
+    synchronized (this) {
+      currentBuckets.clear();
+    }
+    lastPrices.clear();
   }
 
   /** Publishes at most one coalesced update per subscribed player for the current scheduler tick. */
