@@ -299,7 +299,7 @@ public final class ExchangeRuntimeFactory {
             recoveryFenceExecutor.close();
             recoveryExecutor.close();
             playerOperations.close();
-            runWhileOwnedOrThrow(database.writer(), () -> marketData.flush(Instant.now()));
+            finalFlushWhileOwned(database.writer(), marketData, Instant.now());
           }, views, administration, actions);
       TransferLoginListener transferLogin = new TransferLoginListener(accountId ->
           runtime.callAsyncWhileWriting(() -> transfers.recoverPlayer(accountId),
@@ -746,10 +746,21 @@ public final class ExchangeRuntimeFactory {
     }
   }
 
-  static void runWhileOwnedOrThrow(SingleWriterGuard writer, ExchangeRuntime.CheckedRunnable work)
-      throws Exception {
-    if (!writer.runWhileHeld(work::run)) {
-      throw new IllegalStateException("exchange writer lock is unavailable during final flush");
+  /**
+   * Best-effort final candle flush during shutdown. A fenced writer or a failing write must never
+   * abort the remaining close sequence (for example the writer's {@code RELEASE_LOCK}); the next
+   * process recovers durable state, and the unflushed minute is logged instead of thrown.
+   */
+  static void finalFlushWhileOwned(SingleWriterGuard writer, MarketDataService marketData,
+                                   Instant at) {
+    try {
+      if (!writer.runWhileHeld(() -> marketData.flush(at))) {
+        LOGGER.warning("exchange writer lock is unavailable during shutdown;"
+            + " final candle flush skipped");
+      }
+    } catch (Exception failure) {
+      LOGGER.log(java.util.logging.Level.WARNING,
+          "final candle flush failed during shutdown", failure);
     }
   }
 

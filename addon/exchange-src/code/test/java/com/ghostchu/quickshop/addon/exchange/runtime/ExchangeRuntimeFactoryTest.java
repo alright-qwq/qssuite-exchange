@@ -1,9 +1,12 @@
 package com.ghostchu.quickshop.addon.exchange.runtime;
 
 import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
+import com.ghostchu.quickshop.addon.exchange.marketdata.CandleAggregator;
+import com.ghostchu.quickshop.addon.exchange.marketdata.MarketDataService;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
@@ -64,7 +67,7 @@ class ExchangeRuntimeFactoryTest {
   }
 
   @Test
-  void finalFlushFailsWhenWriterOwnershipIsUnavailable() {
+  void finalFlushSkipsGracefullyWhenWriterOwnershipIsUnavailable() {
     SingleWriterGuard writer = new SingleWriterGuard() {
       @Override public void acquire() {}
       @Override public boolean held() { return false; }
@@ -72,10 +75,8 @@ class ExchangeRuntimeFactoryTest {
       @Override public void close() {}
     };
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-        ExchangeRuntimeFactory.runWhileOwnedOrThrow(writer, () -> {}))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("writer lock");
+    ExchangeRuntimeFactory.finalFlushWhileOwned(writer,
+        new MarketDataService(new CandleAggregator()), Instant.EPOCH);
   }
 
   @Test
