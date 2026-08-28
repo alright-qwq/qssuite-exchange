@@ -16,10 +16,10 @@
 修改 `config.yml` 或 `markets.yml` 后，执行 `/qse reload`（需要 `quickshop.exchange.admin.reload`），无需重启服务器。重载会热应用：
 
 - `market-data.gui-refresh-ms`、`market-data.candle-retention-days`、`operations.reconciliation-interval-minutes`、`operations.audit-export-retention-days`
-- 各市场的风险参数（价格笼、滑点、停牌阈值、持仓/挂单上限、操作频率）与 maker/taker 费率
+- 各市场的风险参数（价格笼、滑点、停牌阈值、持仓/挂单上限、操作频率），变更通过重载落库为新的版本，重启后依然生效
 - 市场显示名与虚拟证券元数据（新名称立即反映到已打开的界面）
 
-费率/风险变更通过重载落库为新的版本，重启后依然生效。重载会校验整个配置；如果某个市场的结构性字段（币种、价格区间、tick、数量档、资产类型等）发生变化，会明确列出是哪个市场、哪个字段，并提示先暂停该市场、取消未平仓订单再重试。配置文件本身非法时，会提示修正文件后重试，上一份设置仍然生效。不要在未执行重载的情况下直接改 `markets.yml` 的费率后重启：数据库中的活跃费率与文件不一致会导致启动安全失败。
+结构性字段（币种、价格区间、tick、数量档、资产类型、物品/证券定义）与 **maker/taker 费率** 会被热重载拒绝：这些字段影响已挂订单的成交成本与结算口径，错误消息会明确指出是哪个市场、哪个字段，并要求先暂停该市场、取消未平仓订单后重试。费率修改建议停机执行；不要在未执行重载的情况下直接改 `markets.yml` 的费率后重启：数据库中的活跃费率与文件不一致会导致启动安全失败。
 
 `enabled: false` 只影响市场/证券的初始创建状态；运行时启用或停用市场请使用 `/qse admin market pause|resume`，不要依赖修改 `enabled` 后重载。
 
