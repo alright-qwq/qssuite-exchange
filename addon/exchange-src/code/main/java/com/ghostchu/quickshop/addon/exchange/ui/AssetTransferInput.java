@@ -9,6 +9,9 @@ import java.util.UUID;
 final class AssetTransferInput {
   private AssetTransferInput() {}
 
+  private static final int MAX_CURRENCY_SCALE = 4;
+  private static final int MAX_CURRENCY_DIGITS = 18;
+
   static ExchangeMenuRequest currency(UUID requestId, UUID accountId,
                                       ExchangeMenuRequest.TransferKind kind,
                                       String currencyId, String rawAmount) {
@@ -18,6 +21,13 @@ final class AssetTransferInput {
       amount = new BigDecimal(requireInput(rawAmount));
     } catch (NumberFormatException invalid) {
       throw new IllegalArgumentException("invalid money amount", invalid);
+    }
+    if (amount.signum() <= 0) {
+      throw new IllegalArgumentException("money amount must be positive");
+    }
+    if (amount.scale() > MAX_CURRENCY_SCALE
+        || amount.precision() - amount.scale() > MAX_CURRENCY_DIGITS) {
+      throw new IllegalArgumentException("money amount is outside the supported range");
     }
     return ExchangeMenuRequest.transfer(new ExchangeMenuRequest.TransferDraft(
         requestId, accountId, kind, currencyId, amount, 0, null));

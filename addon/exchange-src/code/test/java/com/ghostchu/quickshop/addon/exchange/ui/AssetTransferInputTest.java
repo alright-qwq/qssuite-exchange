@@ -45,6 +45,37 @@ class AssetTransferInputTest {
     assertThatThrownBy(() -> AssetTransferInput.currency(requestId, accountId,
         ExchangeMenuRequest.TransferKind.MONEY_DEPOSIT, "default", "0"))
         .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> AssetTransferInput.currency(requestId, accountId,
+        ExchangeMenuRequest.TransferKind.MONEY_DEPOSIT, "default", "-5"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void rejectsCurrencyAmountsWithExcessivePrecisionOrScale() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    assertThatThrownBy(() -> AssetTransferInput.currency(requestId, accountId,
+        ExchangeMenuRequest.TransferKind.MONEY_DEPOSIT, "default", "0.00001"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> AssetTransferInput.currency(requestId, accountId,
+        ExchangeMenuRequest.TransferKind.MONEY_DEPOSIT, "default", "1000000000000000000000"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void acceptsCurrencyAmountsAtTheSupportedPrecisionBoundary() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    ExchangeMenuRequest request = AssetTransferInput.currency(requestId, accountId,
+        ExchangeMenuRequest.TransferKind.MONEY_WITHDRAWAL, "default", "0.0001");
+
+    assertThat(request.transfer().amount()).isEqualByComparingTo(new BigDecimal("0.0001"));
+  }
+
+  @Test
+  void rejectsMalformedOrNonPositiveItemInput() {
+    UUID requestId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
     assertThatThrownBy(() -> AssetTransferInput.item(requestId, accountId,
         ExchangeMenuRequest.TransferKind.ITEM_DEPOSIT, "diamond/default", "-1"))
         .isInstanceOf(IllegalArgumentException.class);
