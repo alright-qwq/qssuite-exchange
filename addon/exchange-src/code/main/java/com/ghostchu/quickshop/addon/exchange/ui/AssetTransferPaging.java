@@ -4,11 +4,13 @@ package com.ghostchu.quickshop.addon.exchange.ui;
 final class AssetTransferPaging {
   /** Visible transfers per page; one extra row is fetched as a next-page probe. */
   static final int PAGE_SIZE = 12;
+  /** Hard upper bound so a corrupted or hostile page number can never overflow the offset. */
+  static final int MAX_PAGE = 1_000_000;
 
   private AssetTransferPaging() {}
 
   static int page(int requested) {
-    return Math.max(1, requested);
+    return Math.min(MAX_PAGE, Math.max(1, requested));
   }
 
   static int offset(int page) {

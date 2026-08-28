@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
@@ -265,6 +266,26 @@ class ExchangeRuntimeTest {
     assertThatThrownBy(() -> submitter.submit(request).join())
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasRootCauseMessage("exchange request submitter is closed");
+  }
+
+  @Test
+  void surfacesExecutorRejectionDuringShutdownAsFailedFutureInsteadOfThrowing() {
+    ExchangeRuntime runtime = new ExchangeRuntime(new TrackingGuard(new AtomicBoolean()),
+        () -> {}, () -> {}, () -> {});
+    java.util.concurrent.Executor rejecting = command -> {
+      throw new RejectedExecutionException("executor is closed");
+    };
+    RuntimeExchangeRequestSubmitter submitter =
+        new RuntimeExchangeRequestSubmitter(runtime, rejecting);
+    ExchangeMenuRequest request = ExchangeMenuRequest.cancel(
+        UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+
+    CompletableFuture<ExchangeRequestSubmitter.SubmissionResult> future = submitter.submit(request);
+
+    assertThat(future).isCompletedExceptionally();
+    assertThatThrownBy(future::join)
+        .hasCauseInstanceOf(RejectedExecutionException.class)
+        .hasRootCauseMessage("executor is closed");
   }
 
   private static final class TrackingGuard implements SingleWriterGuard {

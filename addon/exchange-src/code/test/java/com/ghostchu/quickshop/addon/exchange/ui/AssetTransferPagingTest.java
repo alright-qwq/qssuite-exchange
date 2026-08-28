@@ -20,6 +20,14 @@ class AssetTransferPagingTest {
   }
 
   @Test
+  void capsHugePagesSoTheOffsetCanNeverOverflow() {
+    assertThat(AssetTransferPaging.page(Integer.MAX_VALUE))
+        .isEqualTo(AssetTransferPaging.MAX_PAGE);
+    assertThat(AssetTransferPaging.offset(Integer.MAX_VALUE))
+        .isEqualTo((long) (AssetTransferPaging.MAX_PAGE - 1) * AssetTransferPaging.PAGE_SIZE);
+  }
+
+  @Test
   void fetchesOneExtraRowAsNextPageProbe() {
     assertThat(AssetTransferPaging.fetchLimit()).isEqualTo(13);
     assertThat(AssetTransferPaging.hasNext(12)).isFalse();

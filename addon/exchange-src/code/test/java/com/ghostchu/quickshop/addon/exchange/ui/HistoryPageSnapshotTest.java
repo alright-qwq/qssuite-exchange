@@ -45,6 +45,12 @@ class HistoryPageSnapshotTest {
   }
 
   @Test
+  void capsHugePagesSoTheOffsetCanNeverOverflow() {
+    assertThat(HistoryPageSnapshot.offset(Integer.MAX_VALUE))
+        .isEqualTo((long) (AssetTransferPaging.MAX_PAGE - 1) * HistoryPageSnapshot.SECTION_SIZE);
+  }
+
+  @Test
   void offersNextPageOnlyWhenAProbeRowWasFetched() {
     assertThat(HistoryPageSnapshot.hasNext(13, 0, 0)).isTrue();
     assertThat(HistoryPageSnapshot.hasNext(0, 13, 0)).isTrue();

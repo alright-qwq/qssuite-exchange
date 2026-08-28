@@ -38,6 +38,17 @@ public final class RuntimeExchangeRequestSubmitter implements ExchangeRequestSub
   @Override
   public CompletableFuture<SubmissionResult> submit(ExchangeMenuRequest request) {
     Objects.requireNonNull(request, "request");
+    try {
+      return dispatch(request);
+    } catch (RuntimeException failure) {
+      // Executor rejection (or any other synchronous fault) racing an addon reload must never
+      // throw into the menu click handler: surface it as a failed future so the GUI can display
+      // the friendly failure message.
+      return CompletableFuture.failedFuture(failure);
+    }
+  }
+
+  private CompletableFuture<SubmissionResult> dispatch(ExchangeMenuRequest request) {
     if (closed.get()) {
       // A confirmation racing an addon reload must never throw into the menu click handler:
       // surface it as a failed future so the GUI can display the friendly failure message.

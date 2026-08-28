@@ -31,7 +31,8 @@ record HistoryPageSnapshot(List<AccountTradeRow> trades, List<TransferRecord> tr
   }
 
   static int offset(int page) {
-    return Math.multiplyExact(Math.max(1, page) - 1, SECTION_SIZE);
+    return Math.multiplyExact(Math.min(AssetTransferPaging.MAX_PAGE, Math.max(1, page)) - 1,
+        SECTION_SIZE);
   }
 
   static boolean hasNext(int trades, int transfers, int ledger) {
