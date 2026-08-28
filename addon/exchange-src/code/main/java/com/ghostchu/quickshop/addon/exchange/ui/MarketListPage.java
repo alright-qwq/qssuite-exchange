@@ -25,6 +25,7 @@ final class MarketListPage {
   private final ExchangeViewService views;
   private final ExchangeMenuContextStore contexts;
   private final ExchangeUiMessages messages;
+  private final MenuNavigation navigation;
   private final java.util.Map<UUID, MarketListSnapshot.SortMode> sortModes =
       new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.Map<UUID, AssetFilter> assetFilters =
@@ -47,6 +48,7 @@ final class MarketListPage {
     this.views = views;
     this.contexts = contexts;
     this.messages = new ExchangeUiMessages(messages);
+    this.navigation = new MenuNavigation(contexts);
   }
 
   void open(PageOpenCallback callback) {
@@ -90,9 +92,7 @@ final class MarketListPage {
     addOverview(page, player, snapshot.overview());
     addFilterControl(page, player);
     addSortControl(page, player);
-    addNavigation(page, player, 0, "CHEST", "ui-nav-assets", ExchangeMenuPage.ASSETS);
-    addNavigation(page, player, 5, "CLOCK", "ui-nav-history", ExchangeMenuPage.HISTORY);
-    addNavigation(page, player, 8, "WRITABLE_BOOK", "ui-nav-orders", ExchangeMenuPage.ORDERS);
+    navigation.addHeader(page, player, messages);
     int slot = 9;
     ExchangeMenuRequest opened = contexts.get(playerId).orElse(null);
     int currentPage = opened == null ? 1 : Math.max(1, opened.page());

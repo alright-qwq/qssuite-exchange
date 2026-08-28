@@ -40,6 +40,7 @@ final class MarketDetailPage {
   private final OrderEntryAccess access;
   private final ExchangeUiMessages messages;
   private final MarketDashboardPresenter presenter = new MarketDashboardPresenter();
+  private final MenuNavigation navigation;
   private final java.util.Map<UUID, Duration> timeframes = new java.util.concurrent.ConcurrentHashMap<>();
 
   /** Releases per-player preferences when the player leaves or the menu closes. */
@@ -59,6 +60,7 @@ final class MarketDetailPage {
     this.prompts = new OrderEntryPrompt(contexts, UUID::randomUUID);
     this.access = new OrderEntryAccess(rollout);
     this.messages = new ExchangeUiMessages(messages);
+    this.navigation = new MenuNavigation(contexts);
   }
 
   void open(PageOpenCallback callback) {
@@ -164,9 +166,7 @@ final class MarketDetailPage {
     addOpenOrderCount(lore, player, row, orders);
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BOOK", 1)
         .customName(Component.text(row.displayName())).lore(lore)).withSlot(4).build());
-    addNavigation(page, player, 0, "COMPASS", "ui-nav-markets", ExchangeMenuPage.MARKETS);
-    addNavigation(page, player, 1, "CHEST", "ui-nav-assets", ExchangeMenuPage.ASSETS);
-    addNavigation(page, player, 2, "WRITABLE_BOOK", "ui-nav-orders", ExchangeMenuPage.ORDERS);
+    navigation.addHeader(page, player, messages);
     addTimeframeControl(page, player,
         contexts.get(playerId).orElse(null));
     addTradeSummary(page, player, dashboard);
@@ -200,7 +200,7 @@ final class MarketDetailPage {
           int next = (index + 1) % TIMEFRAMES.size();
           timeframes.put(playerId, TIMEFRAMES.get(next));
           refresh(page, player, request);
-        })).withSlot(5).build());
+        })).withSlot(8).build());
   }
 
   private void addPlayerBalances(List<Component> lore, Player player, MarketRow row,
@@ -338,14 +338,14 @@ final class MarketDetailPage {
       int slot = 19 + index;
       if (row.empty()) {
         page.addIcon(player.getUniqueId(), new IconBuilder(ExchangeMenuPlatform.stack().of(
-            "GRAY_STAINED_GLASS_PANE", 1)
+            "BLACK_STAINED_GLASS_PANE", 1)
             .customName(messages.component(player, "ui-trend-empty"))).withSlot(slot).build());
         continue;
       }
       String material = switch (row.direction()) {
-        case UP -> "GREEN_CONCRETE";
-        case DOWN -> "RED_CONCRETE";
-        case FLAT -> "YELLOW_CONCRETE";
+        case UP -> "GREEN_STAINED_GLASS_PANE";
+        case DOWN -> "RED_STAINED_GLASS_PANE";
+        case FLAT -> "YELLOW_STAINED_GLASS_PANE";
       };
       var candle = row.candle();
       java.math.BigDecimal change = candle.close().subtract(candle.open());
@@ -353,23 +353,24 @@ final class MarketDetailPage {
           ? java.math.BigDecimal.ZERO
           : change.multiply(java.math.BigDecimal.valueOf(100))
               .divide(candle.open(), 2, java.math.RoundingMode.HALF_UP).stripTrailingZeros();
+      String direction = messages.text(player, directionKey(row.direction()));
+      String changeLabel = changePercent.signum() > 0 ? "+" + changePercent.toPlainString() + "%"
+          : changePercent.signum() < 0 ? changePercent.toPlainString() + "%" : "0%";
       List<Component> lore = new java.util.ArrayList<>(List.of(
-          messages.component(player, "ui-trend-time", candle.bucketStart().toString()),
           messages.component(player, "ui-trend-open",
               messages.formatCurrency(candle.open(), scale)),
+          messages.component(player, "ui-trend-close",
+              messages.formatCurrency(candle.close(), scale)),
           messages.component(player, "ui-trend-high",
               messages.formatCurrency(candle.high(), scale)),
           messages.component(player, "ui-trend-low",
               messages.formatCurrency(candle.low(), scale)),
-          messages.component(player, "ui-trend-close",
-              messages.formatCurrency(candle.close(), scale)),
           messages.component(player, "ui-trend-change", change.stripTrailingZeros().toPlainString(),
               changePercent.toPlainString()),
-          messages.component(player, "ui-trend-volume", candle.volume()),
-          messages.component(player, "ui-trend-strength", row.strength())));
+          messages.component(player, "ui-trend-volume", candle.volume())));
       page.addIcon(player.getUniqueId(), new IconBuilder(ExchangeMenuPlatform.stack().of(material,
-          Math.max(1, row.strength())).customName(messages.component(player,
-              "ui-trend-title", messages.text(player, directionKey(row.direction())))).lore(lore))
+          Math.max(1, row.strength())).customName(messages.component(player, "ui-trend-title",
+              direction + " " + changeLabel)).lore(lore))
           .withSlot(slot).build());
     }
   }

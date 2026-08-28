@@ -24,12 +24,14 @@ final class HistoryPage {
   private final ExchangeViewService views;
   private final ExchangeMenuContextStore contexts;
   private final AddonMessageService messages;
+  private final MenuNavigation navigation;
 
   HistoryPage(ExchangeViewService views, ExchangeMenuContextStore contexts,
               AddonMessageService messages) {
     this.views = views;
     this.contexts = contexts;
     this.messages = messages;
+    this.navigation = new MenuNavigation(contexts);
   }
 
   void open(PageOpenCallback callback) {
@@ -65,7 +67,7 @@ final class HistoryPage {
           .customName(text(player, "ui-data-unavailable"))).withSlot(22).build());
       return;
     }
-    addNavigationHeader(page, player);
+    navigation.addHeader(page, player, new ExchangeUiMessages(messages));
     int slot = 9;
     if (snapshot.trades().isEmpty() && snapshot.transfers().isEmpty() && snapshot.ledger().isEmpty()) {
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
@@ -141,34 +143,6 @@ final class HistoryPage {
     if (snapshot.hasNext()) {
       addNavigation(page, player, 53, "ARROW", "ui-history-next", opened.page() + 1);
     }
-  }
-
-  private void addNavigationHeader(PlayerInstancePage page, Player player) {
-    UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("COMPASS", 1)
-        .customName(text(player, "ui-nav-markets")))
-        .withActions(new RunnableAction(click -> {
-          ExchangeMenuRequest request = ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName());
-          contexts.put(playerId, request);
-          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKETS.page(),
-              click.player());
-        })).withSlot(0).build());
-    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CHEST", 1)
-        .customName(text(player, "ui-nav-assets")))
-        .withActions(new RunnableAction(click -> {
-          ExchangeMenuRequest request = ExchangeMenuRequest.page(ExchangeMenuPage.ASSETS.menuName());
-          contexts.put(playerId, request);
-          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ASSETS.page(),
-              click.player());
-        })).withSlot(1).build());
-    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("WRITABLE_BOOK", 1)
-        .customName(text(player, "ui-nav-orders")))
-        .withActions(new RunnableAction(click -> {
-          ExchangeMenuRequest request = ExchangeMenuRequest.page(ExchangeMenuPage.ORDERS.menuName());
-          contexts.put(playerId, request);
-          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ORDERS.page(),
-              click.player());
-        })).withSlot(2).build());
   }
 
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,
