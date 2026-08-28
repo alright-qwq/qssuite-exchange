@@ -213,7 +213,7 @@ final class RequestSummaryPage {
               ? quote.bestAsk() : quote.bestBid();
           if (executable != null) {
             lines.add(messages.component(player, "ui-confirm-current-quote",
-                executable.toPlainString()));
+                messages.formatCurrency(executable, boundaryScale)));
           }
         }
       }
