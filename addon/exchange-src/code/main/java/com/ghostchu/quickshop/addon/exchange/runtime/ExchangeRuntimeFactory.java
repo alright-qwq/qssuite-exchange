@@ -251,6 +251,7 @@ public final class ExchangeRuntimeFactory {
         markets, repository, new com.ghostchu.quickshop.addon.exchange.operations.AuditExporter(),
         auditDirectory, new SecurityService(repository), inventory, metrics,
         this::addSecurityMarket);
+    administration.updateAuditRetention(auditRetention(addon.getConfig()));
     this.administration = administration;
     Runnable resumeHalted = () -> resumeExpiredHalts(repository, registry.marketIds(), database.writer());
     com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector detector =
@@ -348,6 +349,12 @@ public final class ExchangeRuntimeFactory {
       return Duration.ofMillis(250);
     }
     return Duration.ofMillis(configured);
+  }
+
+  /** Resolves the audit export retention window; zero keeps every export forever. */
+  private static Duration auditRetention(FileConfiguration config) {
+    long days = Math.max(0L, config.getLong("operations.audit-export-retention-days", 90));
+    return Duration.ofDays(days);
   }
 
   /** Re-reads markets.yml/config.yml and hot-applies operational risk settings. */
@@ -448,6 +455,7 @@ public final class ExchangeRuntimeFactory {
           "market-data.candle-retention-days", 365));
       if (liveAdministration != null) {
         liveAdministration.updateAuditDirectory(nextAuditDirectory);
+        liveAdministration.updateAuditRetention(auditRetention(config));
       }
       int nextReconciliationInterval = config.getInt(
           "operations.reconciliation-interval-minutes", 1440);

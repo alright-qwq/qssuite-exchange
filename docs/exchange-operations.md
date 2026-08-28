@@ -15,7 +15,7 @@
 
 修改 `config.yml` 或 `markets.yml` 后，执行 `/qse reload`（需要 `quickshop.exchange.admin.reload`），无需重启服务器。重载会热应用：
 
-- `market-data.gui-refresh-ms`、`market-data.candle-retention-days`、`operations.reconciliation-interval-minutes`
+- `market-data.gui-refresh-ms`、`market-data.candle-retention-days`、`operations.reconciliation-interval-minutes`、`operations.audit-export-retention-days`
 - 各市场的风险参数（价格笼、滑点、停牌阈值、持仓/挂单上限、操作频率）与 maker/taker 费率
 - 市场显示名与虚拟证券元数据（新名称立即反映到已打开的界面）
 
@@ -58,7 +58,7 @@
 /qse admin transfer review resolve <transferId> <success|failure> <evidence>
 ```
 
-审计导出的时间接受 epoch 秒或 ISO-8601 时刻。配置的导出目录必须是相对于插件数据目录的路径。变更型管理操作和对账与玩家结算一样，都运行在同一把写入围栏之后。
+审计导出的时间接受 epoch 秒或 ISO-8601 时刻。配置的导出目录必须是相对于插件数据目录的路径。每次导出后会自动清理超过 `operations.audit-export-retention-days`（默认 90 天，0 表示永不清理）的本插件旧导出文件，只匹配插件自己生成的 `audit-*.csv`，不会触碰目录里的其他文件。变更型管理操作和对账与玩家结算一样，都运行在同一把写入围栏之后。
 
 对账差异会在对账事务中立即保护受影响的市场。物品/市场差异会暂停该市场；货币差异会暂停所有使用该货币的已配置市场。储备不足的订单或无法安全映射的差异会暂停所有已配置市场。每个受影响的市场都会收到 HIGH 级别 `RECONCILIATION_DIFFERENCE` 告警；`OPEN` 或 `HALTED` 市场会通过 CAS 转换到 `PAUSED`，并写入一条追加式 `RECONCILIATION_AUTO_PAUSE` 审计记录。在托管、账本和储备证据被查清、且随后一次对账平衡之前，不要恢复市场。
 

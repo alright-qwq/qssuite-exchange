@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -12,11 +13,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.time.Duration;
 
 /** Streams a time-bounded audit snapshot to a newly generated UTF-8 CSV file. */
 public final class AuditExporter {
   private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
       .withZone(ZoneOffset.UTC);
+  private static final Pattern EXPORT_FILE = Pattern.compile("audit-.*\\.csv");
 
   public Path export(Path auditDirectory, List<AuditRecord> records, Instant fromInclusive,
                      Instant toExclusive) throws IOException {
@@ -42,6 +46,46 @@ public final class AuditExporter {
           .forEach(record -> writeRecord(writer, record));
     }
     return target;
+  }
+
+  /**
+   * Deletes this addon's own exported audit CSVs whose last-modified time is older than the
+   * retention window. Foreign files and directories in the same folder are never touched, and a
+   * pruning failure is always best-effort: the just-finished export must not fail retroactively.
+   */
+  public int retain(Path auditDirectory, Duration retention) {
+    Objects.requireNonNull(auditDirectory, "auditDirectory");
+    Objects.requireNonNull(retention, "retention");
+    if (retention.isNegative()) {
+      throw new IllegalArgumentException("audit export retention must not be negative");
+    }
+    if (retention.isZero()) {
+      return 0;
+    }
+    Path directory = auditDirectory.toAbsolutePath().normalize();
+    Instant cutoff = Instant.now().minus(retention);
+    int removed = 0;
+    try (java.util.stream.Stream<Path> files = Files.list(directory)) {
+      for (Path file : files.toList()) {
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+            || !EXPORT_FILE.matcher(file.getFileName().toString()).matches()) {
+          continue;
+        }
+        try {
+          Instant modified = Files.getLastModifiedTime(file, LinkOption.NOFOLLOW_LINKS)
+              .toInstant();
+          if (modified.isBefore(cutoff)) {
+            Files.deleteIfExists(file);
+            removed++;
+          }
+        } catch (IOException perFileFailure) {
+          // One unprunable file must not block the rest of the retention sweep.
+        }
+      }
+    } catch (IOException ignored) {
+      // The directory may have been removed between the export and the sweep.
+    }
+    return removed;
   }
 
   private static void writeRecord(BufferedWriter writer, AuditRecord record) {

@@ -20,11 +20,13 @@ import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferType;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.logging.Level;
 import java.util.function.BiConsumer;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,6 +39,9 @@ public final class AdminExchangeService {
   private static final String RECONCILE_OPERATION = "RECONCILE";
   private static final String RECONCILIATION_AUTO_PAUSE = "RECONCILIATION_AUTO_PAUSE";
   private static final String RECONCILIATION_DIFFERENCE = "RECONCILIATION_DIFFERENCE";
+  private static final Duration DEFAULT_AUDIT_RETENTION = Duration.ofDays(90);
+  private static final java.util.logging.Logger LOGGER =
+      java.util.logging.Logger.getLogger("QuickShop-Exchange.Admin");
 
   private final Map<String, PersistentOrderService> markets = new ConcurrentHashMap<>();
   private final ExchangeRepository repository;
@@ -46,6 +51,8 @@ public final class AdminExchangeService {
   private final InventoryGateway inventory;
   private final ExchangeMetrics metrics;
   private final BiConsumer<String, Boolean> securityCreated;
+  private final java.util.concurrent.atomic.AtomicReference<Duration> auditRetention =
+      new java.util.concurrent.atomic.AtomicReference<>(DEFAULT_AUDIT_RETENTION);
 
   public AdminExchangeService(Map<String, PersistentOrderService> markets) {
     this(markets, null, null, null, null, null, null, null);
@@ -236,8 +243,14 @@ public final class AdminExchangeService {
         auditExporter, "audit exporter is required for audit export");
     Path directory = Objects.requireNonNull(
         auditDirectory.get(), "audit directory is required for audit export");
-    return exporter.export(
+    Path exported = exporter.export(
         directory, store.auditRecords(fromInclusive, toExclusive), fromInclusive, toExclusive);
+    int pruned = exporter.retain(directory, auditRetention.get());
+    if (pruned > 0) {
+      LOGGER.log(Level.INFO,
+          "Exchange audit export pruned " + pruned + " expired file(s) in " + directory);
+    }
+    return exported;
   }
 
   /**
@@ -246,6 +259,15 @@ public final class AdminExchangeService {
    */
   public void updateAuditDirectory(Path directory) {
     this.auditDirectory.set(Objects.requireNonNull(directory, "directory"));
+  }
+
+  /** Hot-updates how long exported audit CSVs are kept; zero disables pruning. */
+  public void updateAuditRetention(Duration retention) {
+    Objects.requireNonNull(retention, "retention");
+    if (retention.isNegative()) {
+      throw new IllegalArgumentException("audit export retention must not be negative");
+    }
+    auditRetention.set(retention);
   }
 
   public List<TransferRecord> pendingTransferReviews() throws SQLException {
