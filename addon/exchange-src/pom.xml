@@ -29,6 +29,8 @@
     </repository>
   </repositories>
   <build>
+    <sourceDirectory>code/main/java</sourceDirectory>
+    <testSourceDirectory>code/test/java</testSourceDirectory>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -55,7 +57,7 @@
     </plugins>
     <resources>
       <resource>
-        <directory>src/main/resources</directory>
+        <directory>code/main/resources</directory>
         <filtering>true</filtering>
       </resource>
     </resources>

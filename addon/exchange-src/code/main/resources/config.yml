@@ -27,6 +27,8 @@ operations:
   # 玩家背包访问在实体线程上的最大等待毫秒数；超时按离线处理并进入对账，避免永久卡死
   inventory-access-timeout-ms: 10000
   audit-export-directory: audit
+  # 审计导出 CSV 的保留天数，0 表示永不清理；每次导出后自动清理过期文件
+  audit-export-retention-days: 90
 rollout:
   # 上线初期建议开启白名单；正式开放后设为 false 即可对全部玩家开放
   whitelist-enabled: true

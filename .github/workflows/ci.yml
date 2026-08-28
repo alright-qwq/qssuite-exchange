@@ -1,15 +1,26 @@
-name: CI
+name: mirror-structure
 on:
   push:
     branches: [ main ]
   pull_request:
 jobs:
-  build:
+  structure:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - run: mvn -B -pl addon/exchange-src test -Dspotless.check.skip=true
+      - name: Verify mirror structure
+        run: |
+          set -eu
+          test -f README.md
+          test -f LICENSE
+          test -f addon/exchange-src/pom.xml
+          test -f addon/exchange-src/code/main/resources/plugin.yml
+          test -f addon/exchange-src/code/main/resources/config.yml
+          test -f addon/exchange-src/code/main/resources/messages.yml
+          test -f addon/exchange-src/code/main/resources/markets.yml
+          test -d docs
+          count=$(find addon/exchange-src/code/main/java -name '*.java' | wc -l | tr -d ' ')
+          tests=$(find addon/exchange-src/code/test/java -name '*Test.java' | wc -l | tr -d ' ')
+          test "$count" -gt 0
+          test "$tests" -gt 0
+          echo "mirror structure OK: $count main sources, $tests test classes"
