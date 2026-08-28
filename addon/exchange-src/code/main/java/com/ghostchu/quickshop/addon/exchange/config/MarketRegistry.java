@@ -12,7 +12,9 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.Material;
 import com.ghostchu.quickshop.addon.exchange.platform.FingerprintMode;
 import com.ghostchu.quickshop.addon.exchange.core.model.FeeRates;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /** Holds market configuration and only permits structural changes on a paused empty book. */
 public final class MarketRegistry {
@@ -41,6 +43,8 @@ public final class MarketRegistry {
     ConfigurationSection riskDefaults = requiredSection(configuration, "risk-defaults");
     ConfigurationSection configuredMarkets = requiredSection(markets, "markets");
     Map<String, MarketDefinition> definitions = new LinkedHashMap<>();
+    List<String> validationFailures = new ArrayList<>();
+    RuntimeException firstFailure = null;
     for (String marketId : configuredMarkets.getKeys(false)) {
       try {
         ConfigurationSection market = requiredSection(configuredMarkets, marketId);
@@ -70,9 +74,19 @@ public final class MarketRegistry {
                 decimal(security, "base-price"), security.getLong("total-supply"),
                 security.getLong("minimum-unit"))));
       } catch (RuntimeException failure) {
-        throw new IllegalArgumentException(
-            "market '" + marketId + "' is invalid: " + failure.getMessage(), failure);
+        if (firstFailure == null) {
+          firstFailure = failure;
+        }
+        validationFailures.add("market '" + marketId + "' is invalid: " + failure.getMessage());
       }
+    }
+    if (!validationFailures.isEmpty()) {
+      // Report every broken market in a single failure so an operator can fix the whole file at
+      // once instead of reloading repeatedly after each individual correction.
+      throw new IllegalArgumentException(
+          validationFailures.size() + " market(s) failed validation:"
+              + System.lineSeparator() + String.join(System.lineSeparator(), validationFailures),
+          firstFailure);
     }
     return new MarketRegistry(definitions, persistence);
   }

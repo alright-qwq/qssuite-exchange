@@ -265,6 +265,30 @@ class MarketRegistryTest {
   }
 
   @Test
+  void reportsEveryInvalidMarketInOneFailure(@TempDir Path temp) throws Exception {
+    Path config = temp.resolve("config.yml");
+    Path markets = temp.resolve("markets.yml");
+    String first = virtualMarketYaml(false);
+    String second = first
+        .replace("concept_alpha", "concept_beta")
+        .replace("ALPHA", "BETA")
+        .replace("Alpha Holdings", "Beta Holdings")
+        .replace("Concept Alpha", "Concept Beta");
+    String twoMarkets = "markets:\n" + first.substring("markets:\n".length())
+        + second.substring("markets:\n".length());
+    Files.writeString(config, riskDefaultsYaml());
+    Files.writeString(markets, twoMarkets
+        .replace("min-quantity: 1", "min-quantity: 3")
+        .replace("minimum-unit: 1", "minimum-unit: 2"));
+
+    assertThatThrownBy(() -> MarketRegistry.load(config.toFile(), markets.toFile()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("2 market(s) failed validation")
+        .hasMessageContaining("market 'concept_alpha' is invalid")
+        .hasMessageContaining("market 'concept_beta' is invalid");
+  }
+
+  @Test
   void blocksContainerShopIgnoresVirtualSecurityMarkets() {
     MarketRegistry registry = new MarketRegistry(Map.of("concept_alpha", virtualDefinition("ALPHA")));
 
