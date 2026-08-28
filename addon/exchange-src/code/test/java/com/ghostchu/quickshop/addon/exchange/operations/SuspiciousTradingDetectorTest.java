@@ -50,6 +50,21 @@ class SuspiciousTradingDetectorTest {
   }
 
   @Test
+  void includesActivityAtTheExactWindowBoundaryButNotOlder() {
+    Instant boundary = now.minus(SuspiciousTradingDetector.ACTIVITY_WINDOW);
+
+    var atBoundary = new SuspiciousTradingDetector(clock).scan(
+        List.of(), cancelPlaceActivities(boundary, 0));
+
+    assertThat(atBoundary.alerts()).hasSize(1);
+
+    var older = new SuspiciousTradingDetector(clock).scan(
+        List.of(), cancelPlaceActivities(boundary, -1));
+
+    assertThat(older.alerts()).isEmpty();
+  }
+
+  @Test
   void deduplicatesRepeatedScansWithinTheWindow() {
     SuspiciousTradingDetector detector = new SuspiciousTradingDetector(clock);
     List<TradeActivity> trades = List.of(
@@ -98,6 +113,20 @@ class SuspiciousTradingDetectorTest {
 
   private TradeActivity trade(UUID buyer, UUID seller, Instant at) {
     return new TradeActivity(buyer, seller, market, at);
+  }
+
+  /** 12 places plus 9 cancels: ratio 0.75 at the boundary, 8/12 inside when one cancel ages out. */
+  private List<OrderActivity> cancelPlaceActivities(Instant boundary, int firstCancelOffsetSeconds) {
+    List<OrderActivity> activities = new java.util.ArrayList<>();
+    for (int i = 0; i < 12; i++) {
+      activities.add(activity(market, OrderActivity.Kind.PLACE, boundary.plusSeconds(i)));
+    }
+    activities.add(activity(market, OrderActivity.Kind.CANCEL,
+        boundary.plusSeconds(firstCancelOffsetSeconds)));
+    for (int i = 0; i < 8; i++) {
+      activities.add(activity(market, OrderActivity.Kind.CANCEL, boundary.plusSeconds(12 + i)));
+    }
+    return activities;
   }
 
   private static OrderActivity activity(String marketId, OrderActivity.Kind kind, Instant at) {

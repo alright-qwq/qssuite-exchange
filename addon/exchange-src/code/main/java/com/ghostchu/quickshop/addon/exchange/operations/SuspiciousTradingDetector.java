@@ -6,11 +6,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -24,11 +22,11 @@ public final class SuspiciousTradingDetector {
   private static final double CANCEL_PLACE_RATIO_THRESHOLD = 0.75;
   private static final int CANCEL_PLACE_MIN_SAMPLES = 20;
   private static final Duration RECIPROCAL_WINDOW = Duration.ofMinutes(5);
-  private static final Duration ACTIVITY_WINDOW = Duration.ofMinutes(10);
+  /** Lookback window the caller must cover when loading order activity for a scan. */
+  public static final Duration ACTIVITY_WINDOW = Duration.ofMinutes(10);
   private static final Duration DEDUPE_WINDOW = Duration.ofMinutes(10);
 
   private final Clock clock;
-  private final Set<String> dedupeKeys = new HashSet<>();
   private final Map<String, Instant> dedupeAt = new HashMap<>();
 
   public SuspiciousTradingDetector(Clock clock) {
@@ -117,7 +115,6 @@ public final class SuspiciousTradingDetector {
     if (existing != null && !alert.at().isBefore(existing)) {
       return false;
     }
-    dedupeKeys.add(key);
     dedupeAt.put(key, alert.at());
     return true;
   }
@@ -125,7 +122,6 @@ public final class SuspiciousTradingDetector {
   private void prune(Instant now) {
     dedupeAt.entrySet().removeIf(entry -> Duration.between(entry.getValue(), now)
         .compareTo(DEDUPE_WINDOW) > 0);
-    dedupeKeys.retainAll(dedupeAt.keySet());
   }
 
   public record TradeActivity(UUID buyerAccountId, UUID sellerAccountId, String marketId,

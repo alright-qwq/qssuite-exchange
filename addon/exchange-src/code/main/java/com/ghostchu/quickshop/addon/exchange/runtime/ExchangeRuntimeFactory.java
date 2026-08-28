@@ -256,7 +256,8 @@ public final class ExchangeRuntimeFactory {
         new com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector(Clock.systemUTC());
     Runnable detectSuspiciousTrading = () -> {
       try {
-        Instant since = Instant.now().minusSeconds(300);
+        Instant since = Instant.now().minus(
+            com.ghostchu.quickshop.addon.exchange.operations.SuspiciousTradingDetector.ACTIVITY_WINDOW);
         var scan = detector.scan(repository.tradesForDetection(since),
             repository.orderActivities(since));
         for (var alert : scan.alerts()) {
