@@ -1404,6 +1404,22 @@ public final class JdbcExchangeRepository
     }
 
     @Override
+    public Optional<String> securitySymbolOwner(String symbol) throws SQLException {
+      Objects.requireNonNull(symbol, "symbol");
+      try (PreparedStatement select = connection.prepareStatement(
+          "SELECT market_id FROM " + tables.securities()
+              + " WHERE UPPER(symbol)=UPPER(?) LIMIT 1" + dialect.forUpdate())) {
+        select.setString(1, symbol);
+        try (ResultSet result = select.executeQuery()) {
+          if (!result.next()) {
+            return Optional.empty();
+          }
+          return Optional.of(result.getString("market_id"));
+        }
+      }
+    }
+
+    @Override
     public void insertSecurityDefinition(SecurityDefinitionState definition) throws SQLException {
       Objects.requireNonNull(definition, "definition");
       try (PreparedStatement insert = connection.prepareStatement(

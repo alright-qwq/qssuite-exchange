@@ -81,6 +81,23 @@ class SecurityServiceTest {
   }
 
   @Test
+  void createRejectsADuplicateSymbolBeforeWritingAnything() throws Exception {
+    UUID actor = UUID.randomUUID();
+    service.create(actor, UUID.randomUUID(), marketId, "ALPHA", "Alpha",
+        "Concept stock", "default", new BigDecimal("10.00"), 1000, 1);
+
+    assertThatThrownBy(() -> service.create(actor, UUID.randomUUID(), "concept_beta",
+        "ALPHA", "Beta", "Duplicate symbol", "default", new BigDecimal("10.00"), 1000, 1))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("security symbol already exists")
+        .hasMessageContaining(marketId);
+
+    // The rejected create left no partial market row behind.
+    assertThat(repository.<Boolean>inTransaction(
+        tx -> tx.marketExists("concept_beta"))).isFalse();
+  }
+
+  @Test
   void createInsertsMarketStateAndSecurityRowsForNewMarket() throws Exception {
     // Drop the pre-seeded rows so this test exercises the fully new-market creation path.
     try (Connection connection = connections.open(); Statement statement = connection.createStatement()) {

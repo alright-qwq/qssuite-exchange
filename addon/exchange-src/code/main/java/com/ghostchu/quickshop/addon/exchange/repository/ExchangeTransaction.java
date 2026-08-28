@@ -47,6 +47,8 @@ public interface ExchangeTransaction {
   SecurityDefinitionState securityDefinition(String marketId) throws SQLException;
   Optional<SecurityDefinitionState> existingSecurityDefinition(String marketId)
       throws SQLException;
+  /** Returns the market id owning the given symbol (case-insensitive), if any. */
+  Optional<String> securitySymbolOwner(String symbol) throws SQLException;
   void insertSecurityDefinition(SecurityDefinitionState definition) throws SQLException;
   void insertMarket(MarketDefinition definition, boolean enabled) throws SQLException;
   boolean marketExists(String marketId) throws SQLException;

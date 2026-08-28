@@ -81,6 +81,10 @@ public final class SecurityService {
       if (existing != null) {
         throw new IllegalArgumentException("security already exists for market: " + marketId);
       }
+      tx.securitySymbolOwner(symbol).ifPresent(owner -> {
+        throw new IllegalArgumentException(
+            "security symbol already exists: " + symbol + " (market " + owner + ")");
+      });
       boolean marketRowExists = tx.marketExists(marketId);
       if (marketRowExists) {
         String assetType = tx.marketAssetType(marketId).orElse(null);
