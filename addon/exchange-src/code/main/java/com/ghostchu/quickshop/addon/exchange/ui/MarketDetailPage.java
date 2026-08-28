@@ -164,8 +164,14 @@ final class MarketDetailPage {
     }
     addPlayerBalances(lore, player, row, assets);
     addOpenOrderCount(lore, player, row, orders);
+    Component quoteTitle = messages.component(player, "ui-market-detail-title",
+        row.displayName(), row.lastPrice() == null ? "-"
+            : messages.formatCurrency(row.lastPrice(), scale));
+    if (row.change24h() != null && row.change24h().signum() != 0) {
+      quoteTitle = quoteTitle.color(changeColor(row.change24h()));
+    }
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BOOK", 1)
-        .customName(Component.text(row.displayName())).lore(lore)).withSlot(4).build());
+        .customName(quoteTitle).lore(lore)).withSlot(4).build());
     navigation.addHeader(page, player, messages);
     addTimeframeControl(page, player,
         contexts.get(playerId).orElse(null));

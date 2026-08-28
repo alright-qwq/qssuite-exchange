@@ -97,19 +97,32 @@ final class AssetsPage {
     for (AssetPageRows.Row row : merged.rows()) {
       if (slot >= 21) break;
       TransferTarget target = row.target();
-      List<Component> lore = List.of(
+      List<Component> lore = new java.util.ArrayList<>(List.of(
           messages.component(player, "ui-assets-available",
               messages.formatCurrency(row.available())),
           messages.component(player, "ui-assets-frozen",
               messages.formatCurrency(row.frozen())),
           messages.component(player, "ui-assets-deposit-action"),
-          messages.component(player, "ui-assets-withdraw-action"));
+          messages.component(player, "ui-assets-withdraw-action")));
+      if (target.kind() == TransferTarget.Kind.ITEM && target.marketId() != null) {
+        lore.add(messages.component(player, "ui-assets-open-market"));
+      }
       IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of(
           target.kind() == TransferTarget.Kind.CURRENCY ? "GOLD_INGOT" : "CHEST", 1)
           .customName(Component.text(target.displayName())).lore(lore));
       icon.withActions(
           new RunnableAction(click -> requestTransfer(playerId, target, true), ActionType.LEFT_CLICK),
-          new RunnableAction(click -> requestTransfer(playerId, target, false), ActionType.RIGHT_CLICK))
+          new RunnableAction(click -> requestTransfer(playerId, target, false), ActionType.RIGHT_CLICK));
+      if (target.kind() == TransferTarget.Kind.ITEM && target.marketId() != null) {
+        icon.withActions(new RunnableAction(click -> {
+          Player online = Bukkit.getPlayer(playerId);
+          if (online == null || !online.isOnline()) return;
+          contexts.put(playerId, ExchangeMenuRequest.market(target.marketId()));
+          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKET_DETAIL.page(),
+              click.player());
+        }, ActionType.DOUBLE_CLICK));
+      }
+      icon
           .withSlot(slot++);
       page.addIcon(playerId, icon.build());
     }
