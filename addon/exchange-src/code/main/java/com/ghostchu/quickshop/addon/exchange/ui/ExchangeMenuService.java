@@ -33,6 +33,12 @@ public final class ExchangeMenuService implements AutoCloseable {
 
   public ExchangeMenuService(ExchangeViewService views, ExchangeRequestSubmitter submitter,
                              RolloutPolicy rollout, AddonMessageService messages) {
+    this(views, submitter, rollout, messages, AdminAction.none());
+  }
+
+  public ExchangeMenuService(ExchangeViewService views, ExchangeRequestSubmitter submitter,
+                             RolloutPolicy rollout, AddonMessageService messages,
+                             AdminAction admin) {
     this.views = Objects.requireNonNull(views, "views");
     this.submitter = submitter;
     contexts = new ExchangeMenuContextStore(this.views::unsubscribeMarketUpdates);
@@ -42,7 +48,8 @@ public final class ExchangeMenuService implements AutoCloseable {
       this.views.unsubscribeMarketUpdates(playerId);
     });
     menu = new ExchangeMenu(this.views, contexts, submitter,
-        Objects.requireNonNull(rollout, "rollout"), messages);
+        Objects.requireNonNull(rollout, "rollout"), messages,
+        admin == null ? AdminAction.none() : admin);
     MenuManager.instance().addMenu(menu);
   }
 
@@ -82,6 +89,10 @@ public final class ExchangeMenuService implements AutoCloseable {
     lifecycle.inventoryClosed(playerId, title);
     if (ExchangeMenu.TITLE.equals(title)) {
       views.unsubscribeMarketUpdates(playerId);
+      // A chat prompt opened from a menu must not outlive the menu: otherwise the player's next
+      // chat message would be swallowed by a stale prompt after they pressed ESC. The close that
+      // launched the prompt (requestInput -> closeInventory) is suppressed exactly once.
+      ExchangeChatInputManager.getInstance().cancelInputAfterMenuClose(playerId);
     }
   }
 

@@ -252,6 +252,9 @@ en-US:
   ui-admin-audit-usage: '/qse admin audit status|ack <alertId>|reconcile|export <from> <to>'
   ui-admin-stock: Stock controls
   ui-admin-stock-usage: '/qse admin stock create|issue|transfer|pause|resume|close'
+  ui-admin-click-to-run: 'Left click: run the common action'
+  ui-admin-click-suggest: 'Left click: copy the command to chat'
+  ui-admin-click-usage: 'Right click: show usage'
 zh-CN:
   command-description: '打开中央物品交易所'
   permission-denied: '你没有执行此交易所操作的权限。'
@@ -506,3 +509,6 @@ zh-CN:
   ui-admin-audit-usage: '/qse admin audit status|ack <告警ID>|reconcile|export <起> <止>'
   ui-admin-stock: 证券控制
   ui-admin-stock-usage: '/qse admin stock create|issue|transfer|pause|resume|close'
+  ui-admin-click-to-run: '左键：执行常用操作'
+  ui-admin-click-suggest: '左键：将命令填入聊天栏'
+  ui-admin-click-usage: '右键：查看用法'

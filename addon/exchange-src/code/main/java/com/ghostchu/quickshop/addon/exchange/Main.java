@@ -338,15 +338,28 @@ public final class Main extends JavaPlugin implements Listener {
   }
 
   private void installPlayerEntrypoints(AddonMessageService messages, RolloutPolicy rollout) {
+    adminReads = new DrainingExecutor("qs-exchange-admin-read-", java.time.Duration.ofSeconds(30));
+    AdminCommandRouter adminRouter = new AdminCommandRouter(runtime.administration(),
+        UUID::randomUUID, work -> runtime.runWhileWriting(work::run),
+        adminReads, runtime.views()::resolveMarketIdBySymbol);
     menus = new ExchangeMenuService(runtime.views(), new RuntimeExchangeRequestSubmitter(runtime),
-        rollout, messages);
+        rollout, messages, (player, args) -> adminRouter.execute(
+            new BukkitCommandActor(player, messages, player.locale(),
+                new BukkitCommandActor.MenuOpener() {
+                  @Override
+                  public void open(String menu, int page) {
+                    menus.open(player, menu, page);
+                  }
+
+                  @Override
+                  public void open(ExchangeMenuRequest request) {
+                    menus.open(player, request);
+                  }
+                }, this::reloadExchangeConfig), args));
     menuListener = new ExchangeMenuListener(menus);
     Bukkit.getPluginManager().registerEvents(menuListener, this);
-    adminReads = new DrainingExecutor("qs-exchange-admin-read-", java.time.Duration.ofSeconds(30));
     ExchangeCommandRouter router = new ExchangeCommandRouter(UUID::randomUUID,
-        new AdminCommandRouter(runtime.administration(), UUID::randomUUID,
-            work -> runtime.runWhileWriting(work::run),
-            adminReads, runtime.views()::resolveMarketIdBySymbol),
+        adminRouter,
         rollout, runtime.views()::resolveMarketIdBySymbol,
         runtime.views()::securitySymbols);
     var actors = (java.util.function.Function<org.bukkit.entity.Player,

@@ -11,12 +11,18 @@ import net.tnemc.menu.core.icon.action.impl.RunnableAction;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-/** Read-only landing page for independently permissioned administrator operations. */
+/** Landing page for independently permissioned administrator operations. */
 final class AdminPage {
   private final ExchangeUiMessages messages;
+  private final AdminAction admin;
 
   AdminPage(AddonMessageService messages) {
+    this(messages, AdminAction.none());
+  }
+
+  AdminPage(AddonMessageService messages, AdminAction admin) {
     this.messages = new ExchangeUiMessages(messages);
+    this.admin = admin == null ? AdminAction.none() : admin;
   }
 
   void open(PageOpenCallback callback) {
@@ -27,26 +33,43 @@ final class AdminPage {
     page.setLockEmptySlots(true);
     if (player == null) return;
     add(page, playerId, player, "quickshop.exchange.admin.market", "COMPASS",
-        "ui-admin-market", "ui-admin-market-usage", 19);
+        "ui-admin-market", "ui-admin-market-usage", null, 19);
     add(page, playerId, player, "quickshop.exchange.admin.orders", "PAPER",
-        "ui-admin-orders", "ui-admin-orders-usage", 21);
+        "ui-admin-orders", "ui-admin-orders-usage", null, 21);
     add(page, playerId, player, "quickshop.exchange.admin.recovery", "ANVIL",
-        "ui-admin-recovery", "ui-admin-recovery-usage", 23);
+        "ui-admin-recovery", "ui-admin-recovery-usage",
+        new String[] {"transfer", "review", "list"}, 23);
     add(page, playerId, player, "quickshop.exchange.admin.audit", "BOOK",
-        "ui-admin-audit", "ui-admin-audit-usage", 25);
+        "ui-admin-audit", "ui-admin-audit-usage",
+        new String[] {"audit", "status"}, 25);
     add(page, playerId, player, "quickshop.exchange.admin.stock", "PAPER",
-        "ui-admin-stock", "ui-admin-stock-usage", 27);
+        "ui-admin-stock", "ui-admin-stock-usage", null, 27);
   }
 
   private void add(PlayerInstancePage page, UUID playerId, Player player,
                    String permission, String material, String titleKey, String usageKey,
-                   int slot) {
+                   String[] actionArgs, int slot) {
     if (!player.hasPermission(permission)) return;
+    String usageText = messages.text(player, usageKey);
+    net.kyori.adventure.text.Component usage = messages.component(player, usageKey)
+        .clickEvent(net.kyori.adventure.text.event.ClickEvent.suggestCommand(
+            usageText.startsWith("/qse ") ? usageText : "/qse " + usageText));
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, titleKey))
-        .lore(java.util.List.of(messages.component(player, usageKey))))
-        .withActions(new RunnableAction(click -> player.sendMessage(
-            messages.component(player, usageKey))))
+        .lore(java.util.List.of(usage,
+            messages.component(player, actionArgs == null
+                ? "ui-admin-click-suggest" : "ui-admin-click-to-run"),
+            messages.component(player, "ui-admin-click-usage"))))
+        .withActions(
+            new RunnableAction(click -> {
+              if (actionArgs == null) {
+                player.sendMessage(usage);
+              } else {
+                admin.execute(player, actionArgs);
+              }
+            }),
+            new RunnableAction(click -> player.sendMessage(usage),
+                net.tnemc.menu.core.icon.action.ActionType.RIGHT_CLICK))
         .withSlot(slot).build());
   }
 }

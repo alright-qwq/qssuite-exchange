@@ -25,6 +25,7 @@ public final class ExchangeChatInputManager implements Listener {
   private static ExchangeChatInputManager instance;
 
   private final Map<UUID, ChatInputContext> pendingInputs = new ConcurrentHashMap<>();
+  private final java.util.Set<UUID> suppressNextClose = ConcurrentHashMap.newKeySet();
   private final JavaPlugin plugin;
   private boolean registered;
 
@@ -57,6 +58,9 @@ public final class ExchangeChatInputManager implements Listener {
                            String menuName, int menuPage) {
     ensureRegistered();
     pendingInputs.put(player.getUniqueId(), new ChatInputContext(handler, menuName, menuPage));
+    // The caller usually closes the menu immediately after requesting input; that close must not
+    // cancel the prompt it just launched.
+    markSuppressClose(suppressNextClose, player.getUniqueId());
     if (prompt != null && !prompt.isEmpty()) {
       player.sendMessage(prompt);
     }
@@ -71,10 +75,33 @@ public final class ExchangeChatInputManager implements Listener {
   }
 
   public void cancelInput(UUID playerId, boolean reopenMenu) {
+    suppressNextClose.remove(playerId);
     ChatInputContext context = pendingInputs.remove(playerId);
     if (reopenMenu && context != null && context.menuName() != null) {
       reopenMenu(playerId, context);
     }
+  }
+
+  /**
+   * Cancels a prompt after its originating menu was closed, unless that close is exactly the one
+   * that launched the prompt (requestInput followed by closeInventory). The suppress flag is
+   * single-shot: a later close always cancels the prompt.
+   */
+  public void cancelInputAfterMenuClose(UUID playerId) {
+    if (shouldSuppressClose(suppressNextClose, playerId)) {
+      return;
+    }
+    cancelInput(playerId);
+  }
+
+  /** Records a single-shot suppression flag for the close that launches a prompt. */
+  static void markSuppressClose(java.util.Set<UUID> suppressFlags, UUID playerId) {
+    suppressFlags.add(playerId);
+  }
+
+  /** Pure single-shot suppression decision, kept separate so tests can verify it without Bukkit. */
+  static boolean shouldSuppressClose(java.util.Set<UUID> suppressFlags, UUID playerId) {
+    return suppressFlags.remove(playerId);
   }
 
   @EventHandler(priority = EventPriority.LOWEST)
@@ -115,7 +142,9 @@ public final class ExchangeChatInputManager implements Listener {
 
   @EventHandler
   public void onPlayerQuit(PlayerQuitEvent event) {
-    pendingInputs.remove(event.getPlayer().getUniqueId());
+    UUID playerId = event.getPlayer().getUniqueId();
+    pendingInputs.remove(playerId);
+    suppressNextClose.remove(playerId);
   }
 
   private void reopenMenu(UUID playerId, ChatInputContext context) {
@@ -148,6 +177,7 @@ public final class ExchangeChatInputManager implements Listener {
       registered = false;
     }
     pendingInputs.clear();
+    suppressNextClose.clear();
   }
 
   private record ChatInputContext(Function<String, Boolean> handler, String menuName,

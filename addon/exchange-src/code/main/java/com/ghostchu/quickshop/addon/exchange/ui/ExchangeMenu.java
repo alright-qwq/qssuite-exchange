@@ -13,6 +13,12 @@ public final class ExchangeMenu extends Menu {
   public ExchangeMenu(ExchangeViewService views, ExchangeMenuContextStore contexts,
                       ExchangeRequestSubmitter submitter, RolloutPolicy rollout,
                       AddonMessageService messages) {
+    this(views, contexts, submitter, rollout, messages, AdminAction.none());
+  }
+
+  public ExchangeMenu(ExchangeViewService views, ExchangeMenuContextStore contexts,
+                      ExchangeRequestSubmitter submitter, RolloutPolicy rollout,
+                      AddonMessageService messages, AdminAction admin) {
     name = NAME;
     title = TITLE;
     rows = 6;
@@ -32,7 +38,7 @@ public final class ExchangeMenu extends Menu {
     addPage(page(ExchangeMenuPage.ORDERS, new MyOrdersPage(views, contexts, messages)::open));
     addPage(page(ExchangeMenuPage.ASSETS, new AssetsPage(views, contexts, messages)::open));
     addPage(page(ExchangeMenuPage.HISTORY, new HistoryPage(views, contexts, messages)::open));
-    addPage(page(ExchangeMenuPage.ADMIN, new AdminPage(messages)::open));
+    addPage(page(ExchangeMenuPage.ADMIN, new AdminPage(messages, admin)::open));
     addPage(page(ExchangeMenuPage.MARKET_TRADES,
         new MarketTradesPage(views, contexts, messages)::open));
   }
