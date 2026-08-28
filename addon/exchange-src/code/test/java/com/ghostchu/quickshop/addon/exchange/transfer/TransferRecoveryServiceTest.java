@@ -55,27 +55,63 @@ class TransferRecoveryServiceTest {
     }
   }
 
+  @org.junit.jupiter.api.Test
+  void releasesFrozenCurrencyWhenMoneyWithdrawalDiedBeforeProcessing() throws Exception {
+    try (Fixture fixture = Fixture.prepared(TransferType.MONEY_WITHDRAWAL, true)) {
+      var before = fixture.repository().inTransaction(transaction ->
+          transaction.currency(fixture.account(), "diamond-usd"));
+      assertThat(before.frozen()).isEqualByComparingTo("2");
+      assertThat(before.available()).isEqualByComparingTo("0");
+
+      TransferRecord recovered = fixture.recovery().recover(fixture.transfer()).join();
+
+      assertThat(recovered.status()).isEqualTo(TransferStatus.FAILED);
+      var after = fixture.repository().inTransaction(transaction ->
+          transaction.currency(fixture.account(), "diamond-usd"));
+      assertThat(after.frozen()).isEqualByComparingTo("0");
+      assertThat(after.available()).isEqualByComparingTo("2");
+    }
+  }
+
+  @org.junit.jupiter.api.Test
+  void failsMoneyDepositThatDiedBeforeProcessing() throws Exception {
+    try (Fixture fixture = Fixture.prepared(TransferType.MONEY_DEPOSIT, false)) {
+      TransferRecord recovered = fixture.recovery().recover(fixture.transfer()).join();
+
+      assertThat(recovered.status()).isEqualTo(TransferStatus.FAILED);
+      assertThat(recovered.failureReason()).contains("interrupted before processing");
+    }
+  }
+
+  @org.junit.jupiter.api.Test
+  void leavesPreparedItemWithdrawalForLaterClaim() throws Exception {
+    try (Fixture fixture = Fixture.prepared(TransferType.ITEM_WITHDRAWAL, true)) {
+      TransferRecord recovered = fixture.recovery().recover(fixture.transfer()).join();
+
+      assertThat(recovered.status()).isEqualTo(TransferStatus.PREPARED);
+      var after = fixture.repository().inTransaction(transaction ->
+          transaction.inventory(fixture.account(), "diamond-usd"));
+      assertThat(after.frozenQuantity()).isEqualTo(2);
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     private final JdbcExchangeRepository repository;
     private final TransferRecord transfer;
+    private final UUID account;
     private final FakeInventoryGateway gateway = new FakeInventoryGateway();
     private final TransferRecoveryService recovery;
 
-    private Fixture(JdbcExchangeRepository repository, TransferRecord transfer) {
+    private Fixture(JdbcExchangeRepository repository, TransferRecord transfer, UUID account) {
       this.repository = repository;
       this.transfer = transfer;
+      this.account = account;
       this.recovery = new TransferRecoveryService(repository, repository, gateway, Runnable::run);
     }
 
     static Fixture interrupted(TransferType type) throws Exception {
-      Path file = Files.createTempFile("quickshop-exchange-recovery-", ".sqlite");
-      file.toFile().deleteOnExit();
-      ConnectionProvider connections = () -> DriverManager.getConnection("jdbc:sqlite:" + file);
-      TableNames tables = new TableNames("recovery_");
-      new MigrationRunner(connections, SqlDialect.SQLITE, tables).migrate();
-      JdbcExchangeRepository repository =
-          new JdbcExchangeRepository(connections, SqlDialect.SQLITE, tables);
       UUID account = UUID.randomUUID();
+      JdbcExchangeRepository repository = newRepository();
       TransferRecord prepared = repository.create(TransferRecord.prepared(
           UUID.randomUUID(), UUID.randomUUID(), account, type, "diamond-usd",
           new BigDecimal("2"), Instant.EPOCH));
@@ -88,7 +124,39 @@ class TransferRecoveryServiceTest {
       }
       TransferRecord processing = repository.transition(prepared.transferId(), prepared.version(),
           TransferStatus.PREPARED, TransferStatus.PROCESSING, null);
-      return new Fixture(repository, processing);
+      return new Fixture(repository, processing, account);
+    }
+
+    static Fixture prepared(TransferType type, boolean frozen) throws Exception {
+      UUID account = UUID.randomUUID();
+      JdbcExchangeRepository repository = newRepository();
+      TransferRecord prepared = repository.create(TransferRecord.prepared(
+          UUID.randomUUID(), UUID.randomUUID(), account, type, "diamond-usd",
+          new BigDecimal("2"), Instant.EPOCH));
+      if (frozen && type == TransferType.MONEY_WITHDRAWAL) {
+        repository.inTransaction(transaction -> {
+          transaction.creditAvailableCurrency(account, "diamond-usd", new BigDecimal("2"));
+          transaction.freezeCurrency(account, "diamond-usd", new BigDecimal("2"));
+          return null;
+        });
+      }
+      if (frozen && type == TransferType.ITEM_WITHDRAWAL) {
+        repository.inTransaction(transaction -> {
+          transaction.creditAvailableItems(account, "diamond-usd", 2);
+          transaction.freezeItems(account, "diamond-usd", 2);
+          return null;
+        });
+      }
+      return new Fixture(repository, prepared, account);
+    }
+
+    private static JdbcExchangeRepository newRepository() throws Exception {
+      Path file = Files.createTempFile("quickshop-exchange-recovery-", ".sqlite");
+      file.toFile().deleteOnExit();
+      ConnectionProvider connections = () -> DriverManager.getConnection("jdbc:sqlite:" + file);
+      TableNames tables = new TableNames("recovery_");
+      new MigrationRunner(connections, SqlDialect.SQLITE, tables).migrate();
+      return new JdbcExchangeRepository(connections, SqlDialect.SQLITE, tables);
     }
 
     JdbcExchangeRepository repository() {
@@ -97,6 +165,10 @@ class TransferRecoveryServiceTest {
 
     TransferRecord transfer() {
       return transfer;
+    }
+
+    UUID account() {
+      return account;
     }
 
     FakeInventoryGateway gateway() {

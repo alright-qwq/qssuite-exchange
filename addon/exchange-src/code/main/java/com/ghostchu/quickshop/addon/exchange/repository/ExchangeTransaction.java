@@ -87,6 +87,8 @@ public interface ExchangeTransaction {
   TransferRecord completeTransfer(UUID transferId, long expectedVersion) throws SQLException;
   TransferRecord failTransfer(UUID transferId, long expectedVersion, String reason)
       throws SQLException;
+  TransferRecord failPreparedTransfer(UUID transferId, long expectedVersion, String reason)
+      throws SQLException;
   TransferRecord resolveReviewedTransfer(
       UUID transferId, long expectedVersion,
       com.ghostchu.quickshop.addon.exchange.transfer.model.TransferStatus targetStatus,

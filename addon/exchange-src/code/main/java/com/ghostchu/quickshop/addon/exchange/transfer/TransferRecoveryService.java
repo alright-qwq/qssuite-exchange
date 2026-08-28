@@ -75,12 +75,34 @@ public final class TransferRecoveryService {
   }
 
   private TransferRecord recoverMoney(TransferRecord transfer) throws SQLException {
+    if (transfer.status() == TransferStatus.PREPARED) {
+      return recoverPreparedMoney(transfer);
+    }
     if (transfer.status() != TransferStatus.PROCESSING) {
       return transfer;
     }
     return transfers.transition(transfer.transferId(), transfer.version(),
         TransferStatus.PROCESSING, TransferStatus.REVIEW_REQUIRED,
         "interrupted external money transfer");
+  }
+
+  private TransferRecord recoverPreparedMoney(TransferRecord transfer) throws SQLException {
+    if (transfer.type() == TransferType.MONEY_WITHDRAWAL) {
+      // The freeze committed before the external deposit, so releasing it is safe:
+      // the economy call only happens after the PREPARED->PROCESSING transition.
+      return repository.inTransaction(transaction -> {
+        transaction.releaseCurrency(transfer.accountId(), transfer.assetId(), transfer.amount());
+        transaction.appendJournal(
+            TransferJournals.releaseMoneyWithdrawal(transfer, transfer.updatedAt()));
+        return transaction.failPreparedTransfer(transfer.transferId(), transfer.version(),
+            "interrupted before processing");
+      });
+    }
+    // A prepared money deposit froze nothing and never touched the external
+    // economy, so it can be failed safely and leaves the unfinished set.
+    return repository.inTransaction(transaction ->
+        transaction.failPreparedTransfer(transfer.transferId(), transfer.version(),
+            "interrupted before processing"));
   }
 
   private TransferRecord recoverItemDeposit(TransferRecord transfer) throws SQLException {

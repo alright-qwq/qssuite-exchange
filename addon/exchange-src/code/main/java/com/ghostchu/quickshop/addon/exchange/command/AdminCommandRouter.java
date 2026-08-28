@@ -325,6 +325,12 @@ public final class AdminCommandRouter {
         });
         return;
       }
+      if (args.length == 4 && "cleanup".equalsIgnoreCase(args[2])) {
+        UUID transferId = UUID.fromString(args[3]);
+        executeWrite(actor, () -> administration.cleanupItemMarkers(
+            actor.accountId(), requestIds.get(), transferId));
+        return;
+      }
       if (args.length >= 6 && "resolve".equalsIgnoreCase(args[2])) {
         UUID transferId = UUID.fromString(args[3]);
         ReviewDecision decision = switch (args[4].toLowerCase(java.util.Locale.ROOT)) {

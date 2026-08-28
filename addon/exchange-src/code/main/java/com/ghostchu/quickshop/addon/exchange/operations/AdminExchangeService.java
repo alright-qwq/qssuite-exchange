@@ -9,6 +9,7 @@ import com.ghostchu.quickshop.addon.exchange.repository.StoredRequestResult;
 import com.ghostchu.quickshop.addon.exchange.security.SecurityMutationResult;
 import com.ghostchu.quickshop.addon.exchange.security.SecurityService;
 import com.ghostchu.quickshop.addon.exchange.transfer.InventoryGateway;
+import com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult;
 import com.ghostchu.quickshop.addon.exchange.service.OrderReceipt;
 import com.ghostchu.quickshop.addon.exchange.service.PersistentOrderService;
 import com.ghostchu.quickshop.addon.exchange.transfer.TransferJournals;
@@ -32,6 +33,7 @@ public final class AdminExchangeService {
   private static final String PAUSE_MARKET_OPERATION = "PAUSE_MARKET";
   private static final String RESUME_MARKET_OPERATION = "RESUME_MARKET";
   private static final String RESOLVE_TRANSFER_REVIEW_OPERATION = "RESOLVE_TRANSFER_REVIEW";
+  private static final String CLEANUP_TRANSFER_MARKERS_OPERATION = "CLEANUP_TRANSFER_MARKERS";
   private static final String RECONCILE_OPERATION = "RECONCILE";
   private static final String RECONCILIATION_AUTO_PAUSE = "RECONCILIATION_AUTO_PAUSE";
   private static final String RECONCILIATION_DIFFERENCE = "RECONCILIATION_DIFFERENCE";
@@ -271,6 +273,59 @@ public final class AdminExchangeService {
   }
 
   /**
+   * Clears the inventory markers of a review-required item transfer so the player's
+   * items become usable again. This is the audited prerequisite for resolving an item
+   * deposit as failed or an item withdrawal as successful.
+   */
+  public TransferRecord cleanupItemMarkers(
+      UUID actorId, UUID requestId, UUID transferId) throws SQLException {
+    Objects.requireNonNull(actorId, "actorId");
+    Objects.requireNonNull(requestId, "requestId");
+    Objects.requireNonNull(transferId, "transferId");
+    ExchangeRepository store = requireRepository();
+    if (!(store instanceof TransferRepository transfers)) {
+      throw new IllegalStateException("repository does not support transfer reviews");
+    }
+    if (inventory == null) {
+      throw new IllegalStateException("inventory gateway is unavailable for marker cleanup");
+    }
+    TransferRecord transfer = transfers.find(transferId)
+        .orElseThrow(() -> new IllegalArgumentException("unknown transfer: " + transferId));
+    if (transfer.status() != TransferStatus.REVIEW_REQUIRED) {
+      throw new IllegalStateException("transfer is not awaiting review: " + transfer.status());
+    }
+    if (transfer.type() != TransferType.ITEM_DEPOSIT
+        && transfer.type() != TransferType.ITEM_WITHDRAWAL) {
+      throw new IllegalArgumentException("marker cleanup applies only to item transfers");
+    }
+    InventoryResult result = inventory.clearMarker(
+        transfer.accountId(), transfer.transferId()).join();
+    if (result != InventoryResult.SUCCESS) {
+      throw new IllegalStateException(
+          "marker cleanup requires the player to be online; gateway returned " + result);
+    }
+    String payload = transferId.toString();
+    Instant cleanedAt = Instant.now();
+    return store.inTransaction(tx -> {
+      StoredRequestResult duplicate = tx.requestResult(actorId, requestId).orElse(null);
+      if (duplicate != null) {
+        if (!CLEANUP_TRANSFER_MARKERS_OPERATION.equals(duplicate.operation())
+            || !payload.equals(duplicate.payload())) {
+          throw new IllegalStateException("request id belongs to another operation");
+        }
+        return transfer;
+      }
+      tx.putRequestResult(new StoredRequestResult(
+          actorId, requestId, CLEANUP_TRANSFER_MARKERS_OPERATION, payload));
+      tx.appendAudit(new AuditRecord(
+          UUID.randomUUID(), actorId, CLEANUP_TRANSFER_MARKERS_OPERATION,
+          transferId.toString(), "type=" + transfer.type() + ";asset=" + transfer.assetId(),
+          transferState(transfer), "markers=cleaned;status=" + transfer.status(), cleanedAt));
+      return transfer;
+    });
+  }
+
+  /**
    * Applies only the internal settlement implied by an administrator's external evidence.
    * This method never invokes the economy or inventory gateways.
    */
@@ -468,12 +523,14 @@ public final class AdminExchangeService {
           "item deposit success requires evidence that the marked items were removed");
     }
     if (transfer.type() == TransferType.ITEM_DEPOSIT
-        && decision == ReviewDecision.CONFIRM_EXTERNAL_FAILURE) {
+        && decision == ReviewDecision.CONFIRM_EXTERNAL_FAILURE
+        && (inventory == null || markedItemQuantity(transfer) > 0)) {
       throw new IllegalStateException(
           "item deposit failure requires marker cleanup before terminal resolution");
     }
     if (transfer.type() == TransferType.ITEM_WITHDRAWAL
-        && decision == ReviewDecision.CONFIRM_EXTERNAL_SUCCESS) {
+        && decision == ReviewDecision.CONFIRM_EXTERNAL_SUCCESS
+        && (inventory == null || markedItemQuantity(transfer) > 0)) {
       throw new IllegalStateException(
           "item withdrawal success requires marker cleanup before terminal resolution");
     }

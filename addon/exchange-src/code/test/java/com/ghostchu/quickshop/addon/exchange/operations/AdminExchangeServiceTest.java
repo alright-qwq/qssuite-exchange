@@ -549,6 +549,86 @@ class AdminExchangeServiceTest {
   }
 
   @Test
+  void cleansItemDepositMarkersThenAllowsFailureResolution() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    UUID account = UUID.randomUUID();
+    TransferRecord reviewed = reviewedTransfer(fixture, account, TransferType.ITEM_DEPOSIT,
+        fixture.rules().marketId(), "2", "inventory deposit removal result unknown");
+    MarkerGateway gateway = new MarkerGateway(2);
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository(),
+        null, null, null, gateway);
+
+    assertThatThrownBy(() -> admin.resolveReview(UUID.randomUUID(), UUID.randomUUID(),
+        reviewed.transferId(), ReviewDecision.CONFIRM_EXTERNAL_FAILURE,
+        "inventory log says removal did not complete"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("marker cleanup");
+
+    TransferRecord cleaned = admin.cleanupItemMarkers(UUID.randomUUID(), UUID.randomUUID(),
+        reviewed.transferId());
+    assertThat(cleaned.status()).isEqualTo(TransferStatus.REVIEW_REQUIRED);
+    assertThat(gateway.markedQuantity).isZero();
+
+    TransferRecord resolved = admin.resolveReview(UUID.randomUUID(), UUID.randomUUID(),
+        reviewed.transferId(), ReviewDecision.CONFIRM_EXTERNAL_FAILURE,
+        "inventory log says removal did not complete");
+    assertThat(resolved.status()).isEqualTo(TransferStatus.FAILED);
+    assertThat(fixture.availableItems(account)).isZero();
+  }
+
+  @Test
+  void cleansItemWithdrawalMarkersThenAllowsSuccessResolution() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    UUID account = fixture.accountWithItems(3);
+    TransferRecord reviewed = reviewedWithdrawal(fixture, account, TransferType.ITEM_WITHDRAWAL,
+        fixture.rules().marketId(), "2");
+    MarkerGateway gateway = new MarkerGateway(2);
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository(),
+        null, null, null, gateway);
+
+    assertThatThrownBy(() -> admin.resolveReview(UUID.randomUUID(), UUID.randomUUID(),
+        reviewed.transferId(), ReviewDecision.CONFIRM_EXTERNAL_SUCCESS,
+        "inventory log confirms marked delivery completed"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("marker cleanup");
+
+    TransferRecord cleaned = admin.cleanupItemMarkers(UUID.randomUUID(), UUID.randomUUID(),
+        reviewed.transferId());
+    assertThat(cleaned.status()).isEqualTo(TransferStatus.REVIEW_REQUIRED);
+    assertThat(gateway.markedQuantity).isZero();
+
+    TransferRecord resolved = admin.resolveReview(UUID.randomUUID(), UUID.randomUUID(),
+        reviewed.transferId(), ReviewDecision.CONFIRM_EXTERNAL_SUCCESS,
+        "inventory log confirms marked delivery completed");
+    assertThat(resolved.status()).isEqualTo(TransferStatus.COMPLETED);
+    assertThat(fixture.availableItems(account)).isEqualTo(1);
+    assertThat(fixture.frozenItems(account)).isZero();
+  }
+
+  @Test
+  void markerCleanupIsIdempotentForTheSameAdministratorRequest() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    UUID account = UUID.randomUUID();
+    TransferRecord reviewed = reviewedTransfer(fixture, account, TransferType.ITEM_DEPOSIT,
+        fixture.rules().marketId(), "2", "inventory deposit removal result unknown");
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository(),
+        null, null, null, new MarkerGateway(2));
+    UUID actor = UUID.randomUUID();
+    UUID requestId = UUID.randomUUID();
+
+    TransferRecord first = admin.cleanupItemMarkers(actor, requestId, reviewed.transferId());
+    TransferRecord duplicate = admin.cleanupItemMarkers(actor, requestId, reviewed.transferId());
+
+    assertThat(duplicate).isEqualTo(first);
+    assertThat(fixture.repository().auditRecords(Instant.EPOCH, Instant.now().plusSeconds(1)))
+        .extracting(AuditRecord::action)
+        .containsOnly("CLEANUP_TRANSFER_MARKERS");
+  }
+
+  @Test
   void reviewResolutionIsIdempotentForTheSameAdministratorRequest() throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
     TransferRecord reviewed = reviewedTransfer(fixture, UUID.randomUUID(),
@@ -609,5 +689,48 @@ class AdminExchangeServiceTest {
         TransferStatus.PROCESSING, null);
     return fixture.repository().transition(processing.transferId(), processing.version(),
         TransferStatus.PROCESSING, TransferStatus.REVIEW_REQUIRED, "external result unknown");
+  }
+
+  private static final class MarkerGateway
+      implements com.ghostchu.quickshop.addon.exchange.transfer.InventoryGateway {
+    private long markedQuantity;
+
+    private MarkerGateway(long markedQuantity) {
+      this.markedQuantity = markedQuantity;
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult> markForDeposit(
+        UUID playerId, org.bukkit.inventory.ItemStack template, long quantity, UUID transferId) {
+      return java.util.concurrent.CompletableFuture.completedFuture(
+          com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult.SUCCESS);
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult> removeMarked(
+        UUID playerId, UUID transferId, long quantity) {
+      return java.util.concurrent.CompletableFuture.completedFuture(
+          com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult.SUCCESS);
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult> deliverMarked(
+        UUID playerId, org.bukkit.inventory.ItemStack template, long quantity, UUID transferId) {
+      return java.util.concurrent.CompletableFuture.completedFuture(
+          com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult.SUCCESS);
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<Long> markedQuantity(UUID playerId, UUID transferId) {
+      return java.util.concurrent.CompletableFuture.completedFuture(markedQuantity);
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult> clearMarker(
+        UUID playerId, UUID transferId) {
+      markedQuantity = 0;
+      return java.util.concurrent.CompletableFuture.completedFuture(
+          com.ghostchu.quickshop.addon.exchange.transfer.InventoryResult.SUCCESS);
+    }
   }
 }

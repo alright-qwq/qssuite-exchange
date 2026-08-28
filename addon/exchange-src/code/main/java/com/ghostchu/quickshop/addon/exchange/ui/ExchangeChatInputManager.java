@@ -89,10 +89,15 @@ public final class ExchangeChatInputManager implements Listener {
     String message = event.getMessage().trim();
     Player eventPlayer = event.getPlayer();
     ExchangeSchedulers.folia().getScheduler().runAtEntityLater(eventPlayer, () -> {
+      if (pendingInputs.get(playerId) != context) {
+        // A newer prompt replaced this one (or the prompt was cancelled) before the
+        // queued input task ran; the stale input must not overwrite the new state.
+        return;
+      }
       try {
         boolean accepted = context.handler().apply(message);
         if (accepted) {
-          pendingInputs.remove(playerId);
+          pendingInputs.remove(playerId, context);
           if (context.menuName() != null) {
             reopenMenu(playerId, context);
           }
@@ -100,7 +105,7 @@ public final class ExchangeChatInputManager implements Listener {
       } catch (RuntimeException failure) {
         plugin.getLogger().warning("Failed to process exchange chat input for " + playerId
             + "; re-opening the menu. Cause: " + failure);
-        pendingInputs.remove(playerId);
+        pendingInputs.remove(playerId, context);
         if (context.menuName() != null) {
           reopenMenu(playerId, context);
         }

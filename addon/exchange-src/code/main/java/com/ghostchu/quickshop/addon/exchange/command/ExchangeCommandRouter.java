@@ -355,7 +355,8 @@ public final class ExchangeCommandRouter {
                 ? prefixMatches(symbolCandidates.get(), args[3])
             : args.length == 3 && "transfer".equalsIgnoreCase(args[1]) ? List.of("review")
             : args.length == 4 && "transfer".equalsIgnoreCase(args[1])
-                && "review".equalsIgnoreCase(args[2]) ? List.of("list", "show", "resolve")
+                && "review".equalsIgnoreCase(args[2])
+                ? List.of("list", "show", "cleanup", "resolve")
             : List.of();
         default -> List.of();
       };

@@ -938,6 +938,13 @@ public final class JdbcExchangeRepository
     }
 
     @Override
+    public TransferRecord failPreparedTransfer(
+        UUID transferId, long expectedVersion, String reason) throws SQLException {
+      return transitionTransfer(transferId, expectedVersion, TransferStatus.PREPARED,
+          TransferStatus.FAILED, reason);
+    }
+
+    @Override
     public TransferRecord resolveReviewedTransfer(
         UUID transferId, long expectedVersion, TransferStatus targetStatus, String reason)
         throws SQLException {
