@@ -20,6 +20,7 @@ en-US:
   reload-requested: Exchange configuration reload requested.
   reload-success: Exchange configuration reloaded successfully.
   reload-failed: 'Exchange reload failed; previous settings are still active. Cause: <0>'
+  runtime-not-started: 'The exchange runtime is not started. Fix the configuration and run /qse reload to retry.'
   admin-transfer-review-list: 'Transfers awaiting review:\n<0>'
   admin-transfer-review-detail: 'Transfer review detail: <0>'
   command-failed: The exchange command could not be completed. Please try again or check the server console.
@@ -265,6 +266,7 @@ zh-CN:
   reload-requested: '已请求重载交易所配置。'
   reload-success: '交易所配置重载成功。'
   reload-failed: '交易所重载失败，上一份设置仍然生效。原因：<0>'
+  runtime-not-started: '交易所运行实例尚未启动。请修正配置后执行 /qse reload 重试。'
   admin-transfer-review-list: '等待审核的转账：\n<0>'
   admin-transfer-review-detail: '转账审核详情：<0>'
   ui-data-unavailable: '交易所数据暂时不可用。'

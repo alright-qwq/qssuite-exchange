@@ -6,6 +6,7 @@ import com.ghostchu.quickshop.addon.exchange.command.AdminCommandRouter;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeCommandRouter;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.command.QseAliasCommand;
+import com.ghostchu.quickshop.addon.exchange.command.RecoveryQseCommand;
 import com.ghostchu.quickshop.addon.exchange.command.RolloutPolicy;
 import com.ghostchu.quickshop.addon.exchange.command.SubCommandExchange;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
@@ -84,7 +85,7 @@ public final class Main extends JavaPlugin implements Listener {
         cleanupAfterFailedStart();
       }
       getLogger().log(Level.SEVERE,
-          "Exchange startup failed; addon remains disabled. Fix the configuration and run"
+          "Exchange startup failed; the exchange is not running. Fix the configuration and run"
               + " /qse reload to retry without restarting the server. Cause:", failure);
     }
   }
@@ -157,6 +158,39 @@ public final class Main extends JavaPlugin implements Listener {
               "Exchange startup listener cleanup failed", cleanupFailure);
         }
       }
+      // Keep /qse reload alive so the operator can fix the configuration and recover without
+      // restarting the server, even when startup never reached the full entrypoint wiring.
+      installRecoveryEntrypoints();
+    }
+  }
+
+  /**
+   * Wires a minimal {@code /qse} executor that only supports reload while the exchange runtime is
+   * not started. Replaced by the full entrypoint set once a later start succeeds.
+   */
+  private void installRecoveryEntrypoints() {
+    qseCommand = Objects.requireNonNull(getCommand("qse"), "qse command missing from plugin.yml");
+    RecoveryQseCommand recovery = new RecoveryQseCommand(recoveryMessages(),
+        player -> player.locale(), this::reloadExchangeConfig);
+    qseCommand.setExecutor(recovery);
+    qseCommand.setTabCompleter(recovery);
+  }
+
+  private AddonMessageService recoveryMessages() {
+    try {
+      return buildMessages();
+    } catch (RuntimeException unreadable) {
+      // A missing/unreadable messages file must never take away the recovery entrypoint.
+      getLogger().warning("messages.yml unavailable for the recovery command; using built-in"
+          + " fallback texts. Cause: " + unreadable.getMessage());
+      return new AddonMessageService(java.util.Map.of("en-US", java.util.Map.of(
+          "permission-denied", "You do not have permission for this exchange action.",
+          "reload-requested", "Exchange configuration reload requested.",
+          "reload-success", "Exchange configuration reloaded successfully.",
+          "reload-failed", "Exchange reload failed; previous settings are still active."
+              + " Cause: <0>",
+          "runtime-not-started", "The exchange runtime is not started. Fix the configuration and"
+              + " run /qse reload to retry.")));
     }
   }
 
