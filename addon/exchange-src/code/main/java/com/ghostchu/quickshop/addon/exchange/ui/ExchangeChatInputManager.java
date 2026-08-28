@@ -33,7 +33,11 @@ public final class ExchangeChatInputManager implements Listener {
   }
 
   public static synchronized void initialize(JavaPlugin plugin) {
-    instance = new ExchangeChatInputManager(plugin);
+    if (instance == null || instance.plugin == null) {
+      // Create once per plugin lifecycle. Reloads reuse the same manager so the Bukkit listener
+      // is never registered twice; an inert plugin-less fallback instance is replaced instead.
+      instance = new ExchangeChatInputManager(plugin);
+    }
   }
 
   public static ExchangeChatInputManager getInstance() {
