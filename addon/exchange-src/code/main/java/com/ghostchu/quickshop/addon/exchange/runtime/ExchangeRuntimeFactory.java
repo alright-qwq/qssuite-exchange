@@ -491,7 +491,7 @@ public final class ExchangeRuntimeFactory {
               addon.getLogger().warning("Exchange reconciliation detected differences and paused "
                   + "the affected markets: " + report);
             }
-          } catch (SQLException failure) {
+          } catch (Exception failure) {
             // Best-effort maintenance: the next scheduled cycle retries without a restart.
             addon.getLogger().warning("Exchange scheduled reconciliation failed and will retry "
                 + "next cycle: " + failure.getMessage());
