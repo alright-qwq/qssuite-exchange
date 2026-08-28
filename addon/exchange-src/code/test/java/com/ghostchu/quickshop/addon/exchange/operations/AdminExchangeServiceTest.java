@@ -111,6 +111,7 @@ class AdminExchangeServiceTest {
     admin.acknowledgeAlert(actor, alert.alertId());
 
     assertThat(fixture.repository().openAlerts(10)).isEmpty();
+    assertThat(admin.auditStatus().openAlertCount()).isZero();
     assertThat(fixture.repository().auditRecords(Instant.EPOCH, Instant.now().plusSeconds(1)))
         .singleElement()
         .satisfies(record -> {
