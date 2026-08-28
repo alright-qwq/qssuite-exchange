@@ -42,7 +42,7 @@ final class AdminPage {
                    String permission, String material, String titleKey, String usageKey,
                    int slot) {
     if (!player.hasPermission(permission)) return;
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, titleKey))
         .lore(java.util.List.of(messages.component(player, usageKey))))
         .withActions(new RunnableAction(click -> player.sendMessage(

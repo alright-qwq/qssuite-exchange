@@ -1,6 +1,7 @@
 package com.ghostchu.quickshop.addon.exchange.command;
 
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.Main.ReloadResult;
 import java.util.Locale;
 import java.util.Objects;
@@ -50,7 +51,7 @@ public final class BukkitCommandActor implements CommandActor {
   @Override
   public void executeAtOwner(Runnable action) {
     Objects.requireNonNull(action, "action");
-    QuickShop.folia().getScheduler().runAtEntityLater(player, action, 1L);
+    ExchangeSchedulers.folia().getScheduler().runAtEntityLater(player, action, 1L);
   }
 
   @Override

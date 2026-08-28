@@ -9,12 +9,15 @@ import com.ghostchu.quickshop.addon.exchange.command.QseAliasCommand;
 import com.ghostchu.quickshop.addon.exchange.command.RolloutPolicy;
 import com.ghostchu.quickshop.addon.exchange.command.SubCommandExchange;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.runtime.ExchangeRuntime;
 import com.ghostchu.quickshop.addon.exchange.runtime.ExchangeRuntimeFactory;
 import com.ghostchu.quickshop.addon.exchange.runtime.RuntimeExchangeRequestSubmitter;
 import com.ghostchu.quickshop.addon.exchange.runtime.DrainingExecutor;
 import com.ghostchu.quickshop.addon.exchange.runtime.ShutdownSequence;
 import com.ghostchu.quickshop.addon.exchange.ui.ExchangeMenuListener;
+import com.ghostchu.quickshop.addon.exchange.ui.ExchangeChatInputManager;
+import com.ghostchu.quickshop.addon.exchange.ui.ExchangeMenuPlatform;
 import com.ghostchu.quickshop.addon.exchange.ui.ExchangeMenuService;
 import com.ghostchu.quickshop.api.command.CommandContainer;
 import com.ghostchu.quickshop.api.event.QSConfigurationReloadEvent;
@@ -92,6 +95,11 @@ public final class Main extends JavaPlugin implements Listener {
    */
   private void startExchange() throws Exception {
     synchronized (lifecycleLock) {
+      // The menu platform and chat prompt manager are process-wide singletons; initialize them
+      // once so reloads never register duplicate menu listeners.
+      ExchangeSchedulers.initialize(this);
+      ExchangeMenuPlatform.initialize(this);
+      ExchangeChatInputManager.initialize(this);
       ExchangeRuntimeFactory previousFactory = runtimeFactory;
       if (previousFactory != null) {
         try {
@@ -155,6 +163,10 @@ public final class Main extends JavaPlugin implements Listener {
   @Override
   public void onDisable() {
     synchronized (lifecycleLock) {
+      ExchangeChatInputManager chatInputs = ExchangeChatInputManager.getInstance();
+      if (chatInputs != null) {
+        chatInputs.shutdown();
+      }
       ExchangeRuntime activeRuntime = runtime;
       ExchangeRuntimeFactory activeFactory = runtimeFactory;
       mainListenerRegistered = false;

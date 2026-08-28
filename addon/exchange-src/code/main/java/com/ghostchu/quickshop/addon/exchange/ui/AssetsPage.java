@@ -4,8 +4,9 @@ import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.marketdata.MarketQuote;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.repository.AccountAssetBalance;
-import com.ghostchu.quickshop.menu.shared.GuiChatInputManager;
+import com.ghostchu.quickshop.addon.exchange.ui.ExchangeChatInputManager;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +68,7 @@ final class AssetsPage {
       if (opened == null || !contexts.isCurrent(playerId, opened)) return;
       Player player = Bukkit.getPlayer(playerId);
       if (player == null || !player.isOnline()) return;
-      QuickShop.folia().getScheduler().runAtEntityLater(player,
+      ExchangeSchedulers.folia().getScheduler().runAtEntityLater(player,
           () -> {
             if (ExchangePageRenderGuard.permits(contexts, playerId, opened, player::isOnline)) {
               render(page, player, snapshot, failure, pageNumber);
@@ -82,7 +83,7 @@ final class AssetsPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     if (failure != null || snapshot == null || snapshot.failure() != null) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BARRIER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BARRIER", 1)
           .customName(messages.component(player, "ui-data-unavailable"))).withSlot(22).build());
       return;
     }
@@ -100,7 +101,7 @@ final class AssetsPage {
               messages.formatCurrency(row.frozen())),
           messages.component(player, "ui-assets-deposit-action"),
           messages.component(player, "ui-assets-withdraw-action"));
-      IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of(
+      IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of(
           target.kind() == TransferTarget.Kind.CURRENCY ? "GOLD_INGOT" : "CHEST", 1)
           .customName(Component.text(target.displayName())).lore(lore));
       icon.withActions(
@@ -110,7 +111,7 @@ final class AssetsPage {
       page.addIcon(playerId, icon.build());
     }
     if (merged.rows().size() > 12) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BOOK", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BOOK", 1)
           .customName(messages.component(player, "ui-assets-more-currency",
               merged.rows().size() - 12))).withSlot(20).build());
     }
@@ -128,7 +129,7 @@ final class AssetsPage {
         securityLore.add(messages.component(player, "ui-assets-market-value",
             messages.formatCurrency(marketValue, marketPriceScale(security.marketId()))));
       }
-      IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of("EMERALD", 1)
+      IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of("EMERALD", 1)
           .customName(Component.text(security.displayName())).lore(securityLore));
       icon.withActions(new RunnableAction(click -> {
         Player online = Bukkit.getPlayer(playerId);
@@ -140,7 +141,7 @@ final class AssetsPage {
       page.addIcon(playerId, icon.build());
     }
     if (merged.securities().size() > 12) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("MAP", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("MAP", 1)
           .customName(messages.component(player, "ui-assets-more-securities",
               merged.securities().size() - 12))).withSlot(32).build());
     }
@@ -157,12 +158,12 @@ final class AssetsPage {
               transfer.status() + reason),
           messages.component(player, "ui-history-created-at",
               messages.relativeTime(transfer.updatedAt())));
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("HOPPER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("HOPPER", 1)
           .customName(messages.component(player, "ui-assets-transfer-title", transfer.status()))
           .lore(transferLore)).withSlot(slot++).build());
     }
     if (snapshot.transfers().isEmpty()) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("PAPER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
           .customName(messages.component(player, "ui-assets-transfers-empty"))).withSlot(slot++).build());
     }
     addTransferNavigation(page, player, pageNumber,
@@ -173,16 +174,16 @@ final class AssetsPage {
                                      boolean hasNext) {
     UUID playerId = player.getUniqueId();
     if (currentPage > 1) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("ARROW", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("ARROW", 1)
           .customName(messages.component(player, "ui-history-previous")))
           .withActions(new RunnableAction(click -> openAssetsPage(click.player(), currentPage - 1)))
           .withSlot(45).build());
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("CLOCK", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
         .customName(messages.component(player, "ui-assets-transfers-page", currentPage)))
         .withSlot(49).build());
     if (hasNext) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("ARROW", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("ARROW", 1)
           .customName(messages.component(player, "ui-history-next")))
           .withActions(new RunnableAction(click -> openAssetsPage(click.player(), currentPage + 1)))
           .withSlot(53).build());
@@ -224,7 +225,7 @@ final class AssetsPage {
       lore.add(messages.component(player, "ui-assets-total-value-frozen",
           messages.formatCurrency(frozen)));
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("DIAMOND", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("DIAMOND", 1)
         .customName(messages.component(player, "ui-assets-total-value")).lore(lore))
         .withSlot(4).build());
   }
@@ -254,7 +255,7 @@ final class AssetsPage {
 
   private void addMarketsNavigation(PlayerInstancePage page, Player player) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("COMPASS", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("COMPASS", 1)
         .customName(messages.component(player, "ui-nav-markets")))
         .withActions(new RunnableAction(click -> {
           contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName()));
@@ -281,7 +282,7 @@ final class AssetsPage {
     String prompt = target.kind() == TransferTarget.Kind.CURRENCY
         ? messages.text(player, "ui-transfer-money-prompt")
         : messages.text(player, "ui-transfer-item-prompt");
-    GuiChatInputManager.getInstance().requestInput(player, handler, prompt, ExchangeMenu.NAME,
+    ExchangeChatInputManager.getInstance().requestInput(player, handler, prompt, ExchangeMenu.NAME,
         ExchangeMenuPage.TRANSFER_CONFIRM.page());
     player.closeInventory();
   }

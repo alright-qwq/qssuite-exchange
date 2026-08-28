@@ -34,7 +34,7 @@ public final class FoliaInventoryGateway implements InventoryGateway {
   public FoliaInventoryGateway(QuickShop quickShop, NamespacedKey transferMarker) {
     this(
         Bukkit::getPlayer,
-        (player, action) -> QuickShop.folia().getScheduler().runAtEntityWithFallback(
+        (player, action) -> ExchangeSchedulers.folia().getScheduler().runAtEntityWithFallback(
             player, ignored -> action.run(), () -> action.run()),
         quickShop.getItemMatcher()::matches,
         quickShop.platform()::encodeStack,

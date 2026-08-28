@@ -5,6 +5,7 @@ import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.command.RolloutPolicy;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderSide;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeTransaction;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,7 +53,7 @@ final class RequestSummaryPage {
     if (request == null || !expected.menuName().equals(request.menuName())) {
       page.getIcons(playerId).clear();
       page.setLockEmptySlots(true);
-      IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of("BARRIER", 1)
+      IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of("BARRIER", 1)
           .customName(messages.component(player, "ui-confirm-not-selected")))
           .withSlot(22);
       page.addIcon(playerId, icon.build());
@@ -65,7 +66,7 @@ final class RequestSummaryPage {
             if (failure != null || !contexts.isCurrent(playerId, request)) return;
             Player online = Bukkit.getPlayer(playerId);
             if (online == null || !online.isOnline()) return;
-            QuickShop.folia().getScheduler().runAtEntityLater(online,
+            ExchangeSchedulers.folia().getScheduler().runAtEntityLater(online,
                 () -> {
                   if (ExchangePageRenderGuard.permits(contexts, playerId, request, online::isOnline)) {
                     render(page, online, request, quote, null, false);
@@ -78,7 +79,7 @@ final class RequestSummaryPage {
             if (!contexts.isCurrent(playerId, request)) return;
             Player online = Bukkit.getPlayer(playerId);
             if (online == null || !online.isOnline()) return;
-            QuickShop.folia().getScheduler().runAtEntityLater(online,
+            ExchangeSchedulers.folia().getScheduler().runAtEntityLater(online,
                 () -> {
                   if (ExchangePageRenderGuard.permits(contexts, playerId, request, online::isOnline)) {
                     render(page, online, request, null,
@@ -96,13 +97,13 @@ final class RequestSummaryPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     List<Component> lore = summary(player, request, quote, cancelOrder, cancelLoaded);
-    IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of("PAPER", 1)
+    IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
         .customName(messages.component(player, titleKey(request), titleArgument(request)))
         .lore(lore)).withSlot(22);
     page.addIcon(playerId, icon.build());
     if (request.order() != null && request.marketId() != null) {
       page.addIcon(playerId, new IconBuilder(
-          QuickShop.getInstance().stack().of("COMPASS", 1)
+          ExchangeMenuPlatform.stack().of("COMPASS", 1)
               .customName(messages.component(player, "ui-confirm-back-market")))
           .withActions(new RunnableAction(click -> {
             contexts.put(playerId, ExchangeMenuRequest.market(request.marketId()));
@@ -111,7 +112,7 @@ final class RequestSummaryPage {
           })).withSlot(0).build());
     } else if (request.transfer() != null) {
       page.addIcon(playerId, new IconBuilder(
-          QuickShop.getInstance().stack().of("CHEST", 1)
+          ExchangeMenuPlatform.stack().of("CHEST", 1)
               .customName(messages.component(player, "ui-nav-assets")))
           .withActions(new RunnableAction(click -> {
             contexts.put(playerId, ExchangeMenuRequest.page(
@@ -121,7 +122,7 @@ final class RequestSummaryPage {
           })).withSlot(0).build());
     } else if (request.orderId() != null) {
       page.addIcon(playerId, new IconBuilder(
-          QuickShop.getInstance().stack().of("WRITABLE_BOOK", 1)
+          ExchangeMenuPlatform.stack().of("WRITABLE_BOOK", 1)
               .customName(messages.component(player, "ui-nav-orders")))
           .withActions(new RunnableAction(click -> {
             contexts.put(playerId, ExchangeMenuRequest.page(
@@ -132,7 +133,7 @@ final class RequestSummaryPage {
     }
     if (submitter != null && request.requestId() != null
         && (request.order() != null || request.orderId() != null || request.transfer() != null)) {
-      IconBuilder confirm = new IconBuilder(QuickShop.getInstance().stack().of("LIME_CONCRETE", 1)
+      IconBuilder confirm = new IconBuilder(ExchangeMenuPlatform.stack().of("LIME_CONCRETE", 1)
           .customName(messages.component(player, "ui-confirm-action")));
       confirm.withActions(new RunnableAction(click -> submit(request, playerId))).withSlot(31);
       page.addIcon(playerId, confirm.build());
@@ -349,7 +350,7 @@ final class RequestSummaryPage {
     submitter.submit(request).whenComplete((result, failure) -> {
       Player onlinePlayer = Bukkit.getPlayer(playerId);
       if (onlinePlayer == null || !onlinePlayer.isOnline()) return;
-      QuickShop.folia().getScheduler().runAtEntityLater(onlinePlayer, () -> {
+      ExchangeSchedulers.folia().getScheduler().runAtEntityLater(onlinePlayer, () -> {
         if (failure != null) {
           onlinePlayer.sendMessage(messages.component(onlinePlayer, "ui-confirm-submit-failed"));
         } else {
@@ -390,15 +391,15 @@ final class RequestSummaryPage {
     if (request.order() != null && request.marketId() != null) {
       contexts.put(playerId, ExchangeMenuRequest.market(request.marketId()));
       MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKET_DETAIL.page(),
-          QuickShop.getInstance().createMenuPlayer(player));
+          ExchangeMenuPlatform.menuPlayer(player));
     } else if (request.orderId() != null) {
       contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.ORDERS.menuName()));
       MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ORDERS.page(),
-          QuickShop.getInstance().createMenuPlayer(player));
+          ExchangeMenuPlatform.menuPlayer(player));
     } else if (request.transfer() != null) {
       contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.ASSETS.menuName()));
       MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ASSETS.page(),
-          QuickShop.getInstance().createMenuPlayer(player));
+          ExchangeMenuPlatform.menuPlayer(player));
     }
   }
 }

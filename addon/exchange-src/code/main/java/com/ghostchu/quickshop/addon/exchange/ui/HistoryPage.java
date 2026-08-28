@@ -4,6 +4,7 @@ import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.core.model.Trade;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.repository.AccountLedgerEntry;
 import com.ghostchu.quickshop.addon.exchange.transfer.model.TransferRecord;
 import java.util.List;
@@ -45,7 +46,7 @@ final class HistoryPage {
           if (!contexts.isCurrent(playerId, opened)) return;
           Player player = Bukkit.getPlayer(playerId);
           if (player == null || !player.isOnline()) return;
-          QuickShop.folia().getScheduler().runAtEntityLater(player,
+          ExchangeSchedulers.folia().getScheduler().runAtEntityLater(player,
               () -> {
                 if (ExchangePageRenderGuard.permits(contexts, playerId, opened, player::isOnline)) {
                   render(page, player, snapshot, failure);
@@ -60,13 +61,13 @@ final class HistoryPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     if (failure != null || snapshot == null || snapshot.failure() != null) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BARRIER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BARRIER", 1)
           .customName(text(player, "ui-data-unavailable"))).withSlot(22).build());
       return;
     }
     int slot = 9;
     if (snapshot.trades().isEmpty() && snapshot.transfers().isEmpty() && snapshot.ledger().isEmpty()) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("PAPER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
           .customName(text(player, "ui-history-empty"))).withSlot(22).build());
     }
     for (var row : snapshot.trades()) {
@@ -86,7 +87,7 @@ final class HistoryPage {
           text(player, "ui-history-trade-total-fee", totalFee.toPlainString()),
           text(player, "ui-history-trade-my-fee", myFee == null ? "-" : myFee.toPlainString()),
           text(player, "ui-history-created-at", relativeTime(trade.executedAt()))));
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(
           bought ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE", 1)
           .customName(text(player, "ui-history-trade-title",
               direction + " " + trade.marketId(), trade.price().toPlainString()))
@@ -101,7 +102,7 @@ final class HistoryPage {
           text(player, "ui-history-transfer-amount", transfer.amount().toPlainString()),
           text(player, "ui-history-transfer-status", transfer.status() + reason),
           text(player, "ui-history-created-at", relativeTime(transfer.updatedAt())));
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("HOPPER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("HOPPER", 1)
           .customName(text(player, "ui-history-transfer-title", transfer.type())).lore(lore))
           .withSlot(slot++).build());
     }
@@ -113,7 +114,7 @@ final class HistoryPage {
           text(player, "ui-history-ledger-amount", entry.amount().toPlainString()),
           text(player, "ui-history-ledger-reference", entry.referenceId()),
           text(player, "ui-history-created-at", relativeTime(entry.createdAt())));
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("WRITABLE_BOOK", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("WRITABLE_BOOK", 1)
           .customName(text(player, "ui-history-ledger-title", entry.journalType())).lore(lore))
           .withSlot(slot++).build());
     }
@@ -122,7 +123,7 @@ final class HistoryPage {
     if (opened.page() > 1) {
       addNavigation(page, player, 45, "ARROW", "ui-history-previous", opened.page() - 1);
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("CLOCK", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
         .customName(text(player, "ui-history-page", opened.page()))).withSlot(49).build());
     if (snapshot.hasNext()) {
       addNavigation(page, player, 53, "ARROW", "ui-history-next", opened.page() + 1);
@@ -132,7 +133,7 @@ final class HistoryPage {
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,
                              String key, int targetPage) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(text(player, key)))
         .withActions(new RunnableAction(click -> {
           ExchangeMenuRequest request = ExchangeMenuRequest.page("history", targetPage);

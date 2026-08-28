@@ -4,6 +4,7 @@ import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.core.model.MarketStatus;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,7 +56,7 @@ final class MarketListPage {
     UUID playerId = player.getUniqueId();
     views.marketList().whenComplete((snapshot, failure) -> {
       if (!ExchangePageRenderGuard.permits(contexts, playerId, opened, player::isOnline)) return;
-      QuickShop.folia().getScheduler().runAtEntityLater(player,
+      ExchangeSchedulers.folia().getScheduler().runAtEntityLater(player,
           () -> {
             if (ExchangePageRenderGuard.permits(contexts, playerId, opened, player::isOnline)) {
               render(page, player, snapshot, failure);
@@ -70,7 +71,7 @@ final class MarketListPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     if (failure != null) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BARRIER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BARRIER", 1)
           .customName(messages.component(player, "ui-data-unavailable"))).withSlot(22).build());
       return;
     }
@@ -154,7 +155,7 @@ final class MarketListPage {
       } else if (row.status() != MarketStatus.OPEN) {
         material = "BARRIER";
       }
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
           .customName(net.kyori.adventure.text.Component.text(row.displayName()))
           .lore(lore))
           .withActions(new RunnableAction(click -> {
@@ -166,7 +167,7 @@ final class MarketListPage {
     if (start > 0) {
       addPageNavigation(page, player, 45, "ARROW", "ui-history-previous", currentPage - 1);
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("CLOCK", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
         .customName(messages.component(player, "ui-history-page", currentPage))).withSlot(49).build());
     if (end < sorted.size()) {
       addPageNavigation(page, player, 53, "ARROW", "ui-history-next", currentPage + 1);
@@ -176,7 +177,7 @@ final class MarketListPage {
   private void addPageNavigation(PlayerInstancePage page, Player player, int slot, String material,
                                  String key, int targetPage) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, key)))
         .withActions(new RunnableAction(click -> {
           contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName(),
@@ -189,7 +190,7 @@ final class MarketListPage {
   private void addFilterControl(PlayerInstancePage page, Player player) {
     UUID playerId = player.getUniqueId();
     AssetFilter filter = assetFilters.getOrDefault(playerId, AssetFilter.ALL);
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(
         filter == AssetFilter.SECURITY ? "PAPER"
             : filter == AssetFilter.ITEM ? "CHEST" : "HOPPER", 1)
         .customName(messages.component(player, "ui-filter-title", filter.name()))
@@ -219,7 +220,7 @@ final class MarketListPage {
     UUID playerId = player.getUniqueId();
     MarketListSnapshot.SortMode mode =
         sortModes.getOrDefault(playerId, MarketListSnapshot.SortMode.NOTIONAL);
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("COMPARATOR", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("COMPARATOR", 1)
         .customName(messages.component(player, "ui-sort-title", mode.name()))
         .lore(List.of(messages.component(player, "ui-sort-hint"),
             messages.component(player, "ui-sort-current", mode.name()))))
@@ -235,7 +236,7 @@ final class MarketListPage {
     String active = overview.mostActive() == null ? "-" : overview.mostActive().displayName();
     String gainer = overview.biggestGainer() == null ? "-" : overview.biggestGainer().displayName();
     String loser = overview.biggestLoser() == null ? "-" : overview.biggestLoser().displayName();
-    page.addIcon(player.getUniqueId(), new IconBuilder(QuickShop.getInstance().stack().of("MAP", 1)
+    page.addIcon(player.getUniqueId(), new IconBuilder(ExchangeMenuPlatform.stack().of("MAP", 1)
         .customName(messages.component(player, "ui-overview-title"))
         .lore(List.of(
             messages.component(player, "ui-overview-markets", overview.marketCount()),
@@ -265,7 +266,7 @@ final class MarketListPage {
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,
                              String title, ExchangeMenuPage target) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, title)))
         .withActions(new RunnableAction(click -> {
           contexts.put(playerId, ExchangeMenuRequest.page(target.menuName()));

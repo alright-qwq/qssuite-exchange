@@ -4,6 +4,7 @@ import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderSide;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeRepository;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +51,7 @@ final class MarketTradesPage {
       if (!contexts.isCurrent(playerId, opened)) return;
       Player online = Bukkit.getPlayer(playerId);
       if (online == null || !online.isOnline()) return;
-      QuickShop.folia().getScheduler().runAtEntityLater(online,
+      ExchangeSchedulers.folia().getScheduler().runAtEntityLater(online,
           () -> {
             if (ExchangePageRenderGuard.permits(contexts, playerId, opened, online::isOnline)) {
               render(page, online, opened, data == null ? List.of() : data.trades(),
@@ -67,7 +68,7 @@ final class MarketTradesPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     if (failure != null) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BARRIER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BARRIER", 1)
           .customName(messages.component(player, "ui-data-unavailable"))).withSlot(22).build());
       return;
     }
@@ -88,12 +89,12 @@ final class MarketTradesPage {
                 .stripTrailingZeros().toPlainString()));
       }
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BOOK", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BOOK", 1)
         .customName(Component.text(title)).lore(headerLore)).withSlot(4).build());
     addNavigation(page, player, 0, "COMPASS", "ui-nav-markets", ExchangeMenuPage.MARKETS);
     addNavigation(page, player, 2, "PAPER", "ui-market-back-detail", ExchangeMenuPage.MARKET_DETAIL);
     if (trades.isEmpty()) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("PAPER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
           .customName(messages.component(player, "ui-market-recent-empty"))).withSlot(22).build());
     }
     int slot = 9;
@@ -108,7 +109,7 @@ final class MarketTradesPage {
                   .stripTrailingZeros().toPlainString()),
           messages.component(player, "ui-market-recent-trade-time",
               messages.relativeTime(trade.executedAt())));
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(
           buy ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE", 1)
           .customName(messages.component(player, "ui-market-recent-trade-title",
               buy ? messages.text(player, "ui-market-recent-active-buy")
@@ -120,7 +121,7 @@ final class MarketTradesPage {
       addPageNavigation(page, player, 45, "ARROW", "ui-history-previous",
           opened.marketId(), opened.page() - 1);
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("CLOCK", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
         .customName(messages.component(player, "ui-history-page", opened.page()))).withSlot(49).build());
     if (trades.size() > PAGE_SIZE) {
       addPageNavigation(page, player, 53, "ARROW", "ui-history-next",
@@ -131,7 +132,7 @@ final class MarketTradesPage {
   private void addPageNavigation(PlayerInstancePage page, Player player, int slot,
                                  String material, String key, String marketId, int targetPage) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, key)))
         .withActions(new RunnableAction(click -> {
           ExchangeMenuRequest request = ExchangeMenuRequest.marketTrades(marketId, targetPage);
@@ -144,7 +145,7 @@ final class MarketTradesPage {
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,
                              String key, ExchangeMenuPage target) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, key)))
         .withActions(new RunnableAction(click -> {
           ExchangeMenuRequest request = target == ExchangeMenuPage.MARKET_DETAIL

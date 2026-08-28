@@ -7,7 +7,7 @@
     <groupId>com.ghostchu</groupId>
     <artifactId>quickshop-hikari</artifactId>
     <version>6.3.0.0-SNAPSHOT-11</version>
-    <relativePath/>
+    <relativePath>../../pom.xml</relativePath>
   </parent>
   <groupId>com.ghostchu.quickshop.addon</groupId>
   <artifactId>exchange</artifactId>
@@ -90,6 +90,50 @@
     </dependency>
     <dependency>
       <groupId>net.tnemc</groupId>
+      <artifactId>TNML-Bukkit</artifactId>
+      <version>1.7.0.1-SNAPSHOT-5</version>
+      <exclusions>
+        <exclusion>
+          <groupId>net.tnemc</groupId>
+          <artifactId>TNIL-Core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>net.tnemc</groupId>
+      <artifactId>TNML-Folia</artifactId>
+      <version>1.7.0.1-SNAPSHOT-5</version>
+      <exclusions>
+        <exclusion>
+          <groupId>net.tnemc</groupId>
+          <artifactId>TNIL-Core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>net.tnemc</groupId>
+      <artifactId>TNIL-Bukkit</artifactId>
+      <version>0.2.0.0-SNAPSHOT-3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>net.tnemc</groupId>
+          <artifactId>TNIL-Core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>net.tnemc</groupId>
+      <artifactId>TNIL-Paper</artifactId>
+      <version>0.2.0.0-SNAPSHOT-3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>net.tnemc</groupId>
+          <artifactId>TNIL-Core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>net.tnemc</groupId>
       <artifactId>TNIL-Core</artifactId>
       <version>0.2.0.0-SNAPSHOT-3</version>
       <exclusions>
@@ -110,7 +154,6 @@
       <groupId>com.tcoded</groupId>
       <artifactId>FoliaLib</artifactId>
       <version>0.5.1</version>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.ghostchu</groupId>

@@ -4,6 +4,7 @@ import com.ghostchu.quickshop.QuickShop;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.command.RolloutPolicy;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -36,7 +37,7 @@ public final class ExchangeMenuService implements AutoCloseable {
     this.submitter = submitter;
     contexts = new ExchangeMenuContextStore(this.views::unsubscribeMarketUpdates);
     lifecycle = new ExchangeMenuLifecycle(contexts, playerId -> {
-      com.ghostchu.quickshop.menu.shared.GuiChatInputManager.getInstance().cancelInput(playerId);
+      ExchangeChatInputManager.getInstance().cancelInput(playerId);
       MenuManager.instance().removeViewer(playerId);
       this.views.unsubscribeMarketUpdates(playerId);
     });
@@ -56,7 +57,7 @@ public final class ExchangeMenuService implements AutoCloseable {
     try {
       MenuViewer viewer = new MenuViewer(player.getUniqueId());
       MenuManager.instance().addViewer(viewer);
-      MenuPlayer menuPlayer = QuickShop.getInstance().createMenuPlayer(player);
+      MenuPlayer menuPlayer = ExchangeMenuPlatform.menuPlayer(player);
       int page = ExchangeMenuPage.forName(request.menuName()).page();
       MenuManager.instance().open(ExchangeMenu.NAME, page, menuPlayer);
     } catch (Throwable failure) {
@@ -105,11 +106,11 @@ public final class ExchangeMenuService implements AutoCloseable {
   private void closeOnce() {
     for (UUID playerId : contexts.playerIds()) {
       views.unsubscribeMarketUpdates(playerId);
-      com.ghostchu.quickshop.menu.shared.GuiChatInputManager.getInstance().cancelInput(playerId);
+      ExchangeChatInputManager.getInstance().cancelInput(playerId);
       Player player = org.bukkit.Bukkit.getPlayer(playerId);
       if (player != null && player.isOnline()) {
         closeInventoryAtOwner(player,
-            (owner, action) -> QuickShop.folia().getScheduler().runAtEntityLater(owner, action, 1L));
+            (owner, action) -> ExchangeSchedulers.folia().getScheduler().runAtEntityLater(owner, action, 1L));
       }
       MenuManager.instance().removeViewer(playerId);
     }

@@ -5,6 +5,7 @@ import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import com.ghostchu.quickshop.addon.exchange.core.model.Order;
 import com.ghostchu.quickshop.addon.exchange.core.model.OrderSide;
 import com.ghostchu.quickshop.addon.exchange.platform.AddonMessageService;
+import com.ghostchu.quickshop.addon.exchange.platform.ExchangeSchedulers;
 import com.ghostchu.quickshop.addon.exchange.repository.ExchangeTransaction;
 import java.util.List;
 import java.util.UUID;
@@ -66,7 +67,7 @@ final class MyOrdersPage {
       CompletableFuture.allOf(loads.toArray(new CompletableFuture[0])).whenComplete((ignored, ignoredFailure) -> {
         if (!contexts.isCurrent(playerId, opened)) return;
         if (player == null || !player.isOnline()) return;
-        QuickShop.folia().getScheduler().runAtEntityLater(player,
+        ExchangeSchedulers.folia().getScheduler().runAtEntityLater(player,
             () -> {
               if (ExchangePageRenderGuard.permits(contexts, playerId, opened, player::isOnline)) {
                 render(page, player, orders, quotes, failure);
@@ -83,13 +84,13 @@ final class MyOrdersPage {
     page.getIcons(playerId).clear();
     page.setLockEmptySlots(true);
     if (failure != null) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("BARRIER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BARRIER", 1)
           .customName(messages.component(player, "ui-data-unavailable"))).withSlot(22).build());
       return;
     }
     addMarketsNavigation(page, player);
     if (orders.isEmpty()) {
-      page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("PAPER", 1)
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
           .customName(messages.component(player, "ui-orders-empty"))).withSlot(22).build());
     }
     int slot = 9;
@@ -128,7 +129,7 @@ final class MyOrdersPage {
         }
       }
       boolean buying = order.side() == OrderSide.BUY;
-      IconBuilder icon = new IconBuilder(QuickShop.getInstance().stack().of(
+      IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of(
           buying ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE", 1)
           .customName(messages.component(player, "ui-order-title", order.side(),
               views.marketDisplayName(order.marketId())))
@@ -151,7 +152,7 @@ final class MyOrdersPage {
     if (currentPage > 1) {
       addNavigation(page, player, 45, "ARROW", "ui-history-previous", currentPage - 1);
     }
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("CLOCK", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
         .customName(messages.component(player, "ui-history-page", currentPage))).withSlot(49).build());
     if (orders.size() > PAGE_SIZE) {
       addNavigation(page, player, 53, "ARROW", "ui-history-next", currentPage + 1);
@@ -160,7 +161,7 @@ final class MyOrdersPage {
 
   private void addMarketsNavigation(PlayerInstancePage page, Player player) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of("COMPASS", 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("COMPASS", 1)
         .customName(messages.component(player, "ui-nav-markets")))
         .withActions(new RunnableAction(click -> {
           contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName()));
@@ -172,7 +173,7 @@ final class MyOrdersPage {
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,
                              String key, int targetPage) {
     UUID playerId = player.getUniqueId();
-    page.addIcon(playerId, new IconBuilder(QuickShop.getInstance().stack().of(material, 1)
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
         .customName(messages.component(player, key)))
         .withActions(new RunnableAction(click -> {
           ExchangeMenuRequest request = ExchangeMenuRequest.page(
