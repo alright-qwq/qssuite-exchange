@@ -24,11 +24,15 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /** Background-only read facade used by exchange UI pages. */
 public final class ExchangeViewService {
+  private static final Logger LOGGER = Logger.getLogger(ExchangeViewService.class.getName());
+
   private volatile Map<String, MarketView> markets;
   private final MarketDataService marketData;
   private final Executor executor;
@@ -425,13 +429,17 @@ public final class ExchangeViewService {
         String securityStatus = market.assetType() != null
             && "VIRTUAL_SECURITY".equals(market.assetType())
             ? securityStatus(securities, market.marketId()) : null;
-        entries.add(new MarketListPresenter.Entry(market.marketId(), market.displayName(),
-            market.service().marketQuote(marketData), market.assetType(), market.symbol(),
-            market.totalSupply(), securityStatus,
-            issuedSupply(securities, market),
-            recentTrades(market.marketId())));
-      } catch (SQLException failure) {
-        throw new IllegalStateException("failed to load market quote: " + market.marketId(), failure);
+            entries.add(new MarketListPresenter.Entry(market.marketId(), market.displayName(),
+                market.service().marketQuote(marketData), market.assetType(), market.symbol(),
+                market.totalSupply(), securityStatus,
+                issuedSupply(securities, market),
+                recentTrades(market.marketId())));
+      } catch (SQLException | RuntimeException failure) {
+        // One unreadable market (e.g. a manually damaged market-state row) must never blank the
+        // entire market list: skip it with a warning so the remaining markets stay visible and
+        // tradable while the operator repairs the damaged row.
+        LOGGER.log(Level.WARNING, "Skipping unreadable market " + market.marketId()
+            + " in the market list: " + failure, failure);
       }
     }
     return List.copyOf(entries);

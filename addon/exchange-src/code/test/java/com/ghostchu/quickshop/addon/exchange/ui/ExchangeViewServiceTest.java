@@ -228,6 +228,22 @@ class ExchangeViewServiceTest {
   }
 
   @Test
+  void marketListKeepsWorkingWhenOneMarketStateRowIsMissing() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    MarketDataService marketData = new MarketDataService(new CandleAggregator());
+    ExchangeViewService views = new ExchangeViewService(java.util.Map.of("diamond-usd",
+        new ExchangeViewService.MarketView("diamond-usd", "Diamond", fixture.service())),
+        marketData, Runnable::run, fixture.repository());
+    try (var connection = fixture.connections().open();
+        var statement = connection.createStatement()) {
+      statement.execute("DELETE FROM qs_exchange_market_state WHERE market_id='diamond-usd'");
+    }
+
+    // The damaged market is skipped with a warning instead of failing the whole page.
+    assertThat(views.marketList().join().markets()).isEmpty();
+  }
+
+  @Test
   void forwardsCoalescedMarketUpdatesUntilThePlayerUnsubscribes() {
     MarketDataService marketData = new MarketDataService(new CandleAggregator());
     ExchangeViewService views = new ExchangeViewService(java.util.Map.of(), marketData,

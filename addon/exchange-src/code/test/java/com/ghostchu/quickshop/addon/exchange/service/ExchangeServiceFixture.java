@@ -185,6 +185,11 @@ public final class ExchangeServiceFixture {
     return repository;
   }
 
+  /** Test-only raw connection access for simulating database damage. */
+  public ConnectionProvider connections() {
+    return connections;
+  }
+
   public MarketRules rules() {
     return rules;
   }
