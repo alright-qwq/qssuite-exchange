@@ -24,10 +24,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Builds read-only quotes from executed trades and their UTC-minute candles. */
 public final class MarketDataService {
   private static final Duration TICKER_WINDOW = Duration.ofHours(24);
+  private static final Logger LOGGER = Logger.getLogger(MarketDataService.class.getName());
   private final CandleAggregator candles;
   private final ExchangeRepository repository;
   private final Map<String, BigDecimal> lastPrices = new ConcurrentHashMap<>();
@@ -108,19 +111,20 @@ public final class MarketDataService {
     }
   }
 
-  /** Persists every in-memory candle whose UTC minute ended before {@code asOf}. */
+  /**
+   * Persists every in-memory candle whose UTC minute ended before {@code asOf}, retrying buckets
+   * that failed on an earlier rollover. Failed writes keep the candle in memory so quotes remain
+   * correct and the next flush tick retries.
+   */
   public synchronized void flush(Instant asOf) {
     Objects.requireNonNull(asOf, "asOf");
     if (repository == null) {
       return;
     }
     Instant currentBucket = bucketStart(asOf);
-    var iterator = currentBuckets.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<String, Instant> entry = iterator.next();
-      if (entry.getValue().isBefore(currentBucket)) {
-        persistClosedCandle(entry.getKey(), entry.getValue());
-        iterator.remove();
+    for (String marketId : currentBuckets.keySet()) {
+      for (Candle candle : candles.snapshots(marketId, Instant.EPOCH, currentBucket)) {
+        persistClosedCandle(marketId, candle.bucketStart());
       }
     }
   }
@@ -234,14 +238,23 @@ public final class MarketDataService {
     }
   }
 
+  /**
+   * Persists one closed candle. Candle publication is best-effort: a failed write keeps the candle
+   * in memory (so committed trades stay visible in charts) and never aborts the calling trade.
+   */
   private void persistClosedCandle(String marketId, Instant bucket) {
-    Candle candle = candles.snapshot(marketId, bucket)
-        .orElseThrow(() -> new IllegalStateException("missing closed candle"));
+    Candle candle = candles.snapshot(marketId, bucket).orElse(null);
+    if (candle == null) {
+      LOGGER.warning("skipping candle persistence for missing in-memory bucket " + marketId
+          + " at " + bucket);
+      return;
+    }
     try {
       repository.upsertCandle(candle);
       candles.discard(marketId, bucket);
     } catch (SQLException failure) {
-      throw new IllegalStateException("failed to persist closed candle", failure);
+      LOGGER.log(Level.WARNING, "failed to persist closed candle for " + marketId + " at "
+          + bucket + "; will retry on the next flush tick", failure);
     }
   }
 

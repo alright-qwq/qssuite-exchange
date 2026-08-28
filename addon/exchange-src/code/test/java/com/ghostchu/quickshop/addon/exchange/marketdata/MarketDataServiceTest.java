@@ -181,6 +181,31 @@ class MarketDataServiceTest {
   }
 
   @Test
+  void keepsNewTradeVisibleAndRetriesWhenRolloverPersistenceFails() {
+    FlakyRepository repository = new FlakyRepository(1);
+    MarketDataService data = new MarketDataService(new CandleAggregator(), repository);
+    Instant first = Instant.parse("2026-07-26T00:00:40Z");
+    data.recordTrade("diamond-usd", new BigDecimal("100.00"), 2, first);
+    data.recordTrade("diamond-usd", new BigDecimal("110.00"), 3, first.plusSeconds(60));
+
+    MarketQuote quote = data.quote("diamond-usd", new BigDecimal("100.00"),
+        new BigDecimal("99.00"), new BigDecimal("111.00"), MarketStatus.OPEN,
+        first.plusSeconds(60));
+    assertThat(quote.lastPrice()).isEqualByComparingTo("110.00");
+    assertThat(quote.volume24h()).isEqualTo(5L);
+    assertThat(quote.notional24h()).isEqualByComparingTo("530.00");
+    assertThat(repository.candles).isEmpty();
+
+    data.flush(first.plusSeconds(120));
+
+    assertThat(repository.upserts).hasValue(3);
+    assertThat(repository.candles).hasSize(2);
+    assertThat(data.recentCandles("diamond-usd", first, first.plusSeconds(180)))
+        .extracting(Candle::volume)
+        .containsExactly(2L, 3L);
+  }
+
+  @Test
   void mergesPersistedAndCurrentCandlesForRecentChartData() {
     RecordingRepository repository = new RecordingRepository();
     MarketDataService data = new MarketDataService(new CandleAggregator(), repository);
@@ -213,7 +238,7 @@ class MarketDataServiceTest {
   }
 
   private static class RecordingRepository implements ExchangeRepository {
-    private final List<Candle> candles = new ArrayList<>();
+    final List<Candle> candles = new ArrayList<>();
 
     @Override
     public <T> T inTransaction(TransactionWork<T> work) throws SQLException {
@@ -221,7 +246,7 @@ class MarketDataServiceTest {
     }
 
     @Override
-    public void upsertCandle(Candle candle) {
+    public void upsertCandle(Candle candle) throws SQLException {
       candles.add(candle);
     }
 
@@ -240,7 +265,7 @@ class MarketDataServiceTest {
     private final CountDownLatch allowRead = new CountDownLatch(1);
 
     @Override
-    public void upsertCandle(Candle candle) {
+    public void upsertCandle(Candle candle) throws SQLException {
       super.upsertCandle(candle);
       persisted.countDown();
       try {
@@ -265,6 +290,25 @@ class MarketDataServiceTest {
         throw new IllegalStateException(failure);
       }
       return super.loadCandles(marketId, fromInclusive, toExclusive);
+    }
+  }
+
+  /** Fails the first {@code failures} candle writes, then records like {@link RecordingRepository}. */
+  private static final class FlakyRepository extends RecordingRepository {
+    private final AtomicInteger upserts = new AtomicInteger();
+    private final AtomicInteger failuresRemaining;
+
+    FlakyRepository(int failures) {
+      this.failuresRemaining = new AtomicInteger(failures);
+    }
+
+    @Override
+    public void upsertCandle(Candle candle) throws SQLException {
+      upserts.incrementAndGet();
+      if (failuresRemaining.getAndUpdate(remaining -> remaining > 0 ? remaining - 1 : 0) > 0) {
+        throw new SQLException("simulated candle persistence outage");
+      }
+      super.upsertCandle(candle);
     }
   }
 
