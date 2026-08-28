@@ -118,6 +118,7 @@ public final class ExchangeRuntimeFactory {
             database.connections(), database.dialect(), tables);
         registerMarkets(database.connections(), tables, configured);
         validateRegisteredMarkets(database.connections(), tables, configured);
+        warnAboutOrphanedMarkets(database.connections(), tables, configured, addon.getLogger());
         bootstrapped.set(repository);
       });
       if (!startupOwned || bootstrapped.get() == null) {
@@ -907,6 +908,40 @@ public final class ExchangeRuntimeFactory {
             "configured market asset type changed: " + marketId + " expected "
                 + definition.assetType().name() + " but database has " + assetType);
       }
+    }
+  }
+
+  /**
+   * Warns about database market rows that no longer appear in markets.yml. The rows (and any
+   * orders, balances or history) are intentionally left untouched so an accidental config removal
+   * can be undone; without the warning an operator could believe the market is fully gone.
+   */
+  static void warnAboutOrphanedMarkets(
+      ConnectionProvider connections, TableNames tables, MarketRegistry registry,
+      java.util.logging.Logger logger) throws SQLException {
+    java.util.Objects.requireNonNull(connections, "connections");
+    java.util.Objects.requireNonNull(tables, "tables");
+    java.util.Objects.requireNonNull(registry, "registry");
+    java.util.Objects.requireNonNull(logger, "logger");
+    java.util.Set<String> configured = registry.marketIds();
+    java.util.List<String> orphans = new java.util.ArrayList<>();
+    try (Connection connection = connections.open();
+        PreparedStatement query = connection.prepareStatement(
+            "SELECT market_id FROM " + tables.markets())) {
+      try (ResultSet result = query.executeQuery()) {
+        while (result.next()) {
+          String marketId = result.getString(1);
+          if (!configured.contains(marketId)) {
+            orphans.add(marketId);
+          }
+        }
+      }
+    }
+    if (!orphans.isEmpty()) {
+      logger.warning("Exchange found " + orphans.size() + " market(s) in the database that are"
+          + " missing from markets.yml: " + String.join(", ", orphans)
+          + ". Add them back to markets.yml to keep trading, or pause them and cancel their open"
+          + " orders before deleting the database rows.");
     }
   }
 

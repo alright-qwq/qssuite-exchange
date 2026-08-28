@@ -1,13 +1,27 @@
 package com.ghostchu.quickshop.addon.exchange.runtime;
 
 import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
+import com.ghostchu.quickshop.addon.exchange.config.MarketRegistry;
 import com.ghostchu.quickshop.addon.exchange.marketdata.CandleAggregator;
 import com.ghostchu.quickshop.addon.exchange.marketdata.MarketDataService;
+import com.ghostchu.quickshop.addon.exchange.persistence.ConnectionProvider;
+import com.ghostchu.quickshop.addon.exchange.persistence.JdbcExchangeRepository;
+import com.ghostchu.quickshop.addon.exchange.persistence.MigrationRunner;
+import com.ghostchu.quickshop.addon.exchange.persistence.SqlDialect;
+import com.ghostchu.quickshop.addon.exchange.persistence.SqliteTestDatabase;
+import com.ghostchu.quickshop.addon.exchange.persistence.TableNames;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -166,6 +180,38 @@ class ExchangeRuntimeFactoryTest {
     assertThat(limits.maximumOpenOrders()).isEqualTo(9);
     assertThat(limits.operationsPerSecond()).isEqualTo(3);
     assertThat(limits.operationsPerMinute()).isEqualTo(17);
+  }
+
+  @Test
+  void startupWarnsAboutDatabaseMarketsMissingFromConfig() throws Exception {
+    Path databaseFile = Files.createTempFile("quickshop-exchange-orphan-", ".sqlite");
+    ConnectionProvider connections = SqliteTestDatabase.at(databaseFile);
+    TableNames tables = new TableNames("qs_");
+    new MigrationRunner(connections, SqlDialect.SQLITE, tables).migrate();
+    MarketDefinition configured = fixtureDefinition("0.01", "0.001", "0.002");
+    MarketDefinition orphaned = new MarketDefinition("orphaned_market", "Orphaned", false,
+        configured.item(), configured.structural(), configured.risk(), false);
+    try (Connection connection = connections.open()) {
+      JdbcExchangeRepository.insertMarket(connection, tables, configured, false);
+      JdbcExchangeRepository.insertMarket(connection, tables, orphaned, false);
+    }
+    MarketRegistry registry = new MarketRegistry(
+        Map.of(configured.marketId(), configured));
+
+    List<String> warnings = new ArrayList<>();
+    Logger logger = Logger.getLogger("test.quickshop-exchange-orphan");
+    logger.setUseParentHandlers(false);
+    logger.addHandler(new Handler() {
+      @Override public void publish(LogRecord record) { warnings.add(record.getMessage()); }
+      @Override public void flush() {}
+      @Override public void close() {}
+    });
+
+    ExchangeRuntimeFactory.warnAboutOrphanedMarkets(connections, tables, registry, logger);
+
+    assertThat(warnings)
+        .anyMatch(message -> message.contains("orphaned_market")
+            && message.contains("missing from markets.yml"));
   }
 
   private static MarketDefinition fixtureDefinition(String tickSize, String makerRate,
