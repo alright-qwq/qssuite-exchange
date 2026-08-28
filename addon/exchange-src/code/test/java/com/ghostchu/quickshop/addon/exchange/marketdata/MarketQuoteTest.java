@@ -39,6 +39,36 @@ class MarketQuoteTest {
   }
 
   @Test
+  void changeRateIsFlatForAnEmptyTickerWindow() {
+    assertThat(MarketDataService.changeRate(List.of())).isEqualByComparingTo("0");
+  }
+
+  @Test
+  void changeRateUsesCloseOverOpenOfTheTickerWindow() {
+    BigDecimal change = MarketDataService.changeRate(List.of(
+        new Candle("diamond-usd", Instant.EPOCH, new BigDecimal("100"),
+            new BigDecimal("110"), new BigDecimal("90"), new BigDecimal("100"), 3,
+            new BigDecimal("300")),
+        new Candle("diamond-usd", Instant.EPOCH.plusSeconds(60), new BigDecimal("100"),
+            new BigDecimal("120"), new BigDecimal("100"), new BigDecimal("110"), 2,
+            new BigDecimal("220"))));
+
+    assertThat(change).isEqualByComparingTo("0.1");
+  }
+
+  @Test
+  void changeRateToleratesADamagedZeroOpenCandleInsteadOfThrowing() {
+    BigDecimal change = MarketDataService.changeRate(List.of(
+        new Candle("diamond-usd", Instant.EPOCH, BigDecimal.ZERO, BigDecimal.ZERO,
+            BigDecimal.ZERO, BigDecimal.ZERO, 0, BigDecimal.ZERO),
+        new Candle("diamond-usd", Instant.EPOCH.plusSeconds(60), new BigDecimal("100"),
+            new BigDecimal("120"), new BigDecimal("100"), new BigDecimal("110"), 2,
+            new BigDecimal("220"))));
+
+    assertThat(change).isEqualByComparingTo("0");
+  }
+
+  @Test
   void carriesTwentyFourHourHighAndLow() {
     MarketQuote quote = new MarketQuote("diamond-usd", new BigDecimal("100"),
         new BigDecimal("100"), new BigDecimal("99"), new BigDecimal("101"),

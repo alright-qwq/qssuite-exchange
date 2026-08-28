@@ -158,10 +158,7 @@ public final class MarketDataService {
     long volume = ticker.stream().mapToLong(Candle::volume).reduce(0L, Math::addExact);
     BigDecimal notional = ticker.stream().map(Candle::notional)
         .reduce(BigDecimal.ZERO, BigDecimal::add);
-    BigDecimal change = ticker.isEmpty() ? BigDecimal.ZERO : ticker.get(ticker.size() - 1).close()
-        .subtract(ticker.getFirst().open())
-        .divide(ticker.getFirst().open(), 8, RoundingMode.HALF_UP)
-        .stripTrailingZeros();
+    BigDecimal change = changeRate(ticker);
     BigDecimal volatility = volatility(ticker, lastPrice);
     BigDecimal high24h = ticker.stream().map(Candle::high).max(BigDecimal::compareTo).orElse(null);
     BigDecimal low24h = ticker.stream().map(Candle::low).min(BigDecimal::compareTo).orElse(null);
@@ -180,6 +177,21 @@ public final class MarketDataService {
       return null;
     }
     return maximum.subtract(minimum).divide(latestClose, 8, RoundingMode.HALF_UP)
+        .stripTrailingZeros();
+  }
+
+  /** Close-over-open change rate of the ticker window; zero when there is no usable open. */
+  static BigDecimal changeRate(List<Candle> candles) {
+    if (candles == null || candles.isEmpty()) {
+      return BigDecimal.ZERO;
+    }
+    BigDecimal firstOpen = candles.getFirst().open();
+    if (firstOpen == null || firstOpen.signum() == 0) {
+      // A damaged candle must not take down quote rendering; the UI treats the rate as flat.
+      return BigDecimal.ZERO;
+    }
+    return candles.get(candles.size() - 1).close().subtract(firstOpen)
+        .divide(firstOpen, 8, RoundingMode.HALF_UP)
         .stripTrailingZeros();
   }
 
