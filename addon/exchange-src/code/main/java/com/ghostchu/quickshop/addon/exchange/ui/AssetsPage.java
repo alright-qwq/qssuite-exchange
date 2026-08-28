@@ -275,9 +275,9 @@ final class AssetsPage {
     java.util.function.Function<String, Boolean> handler =
         target.kind() == TransferTarget.Kind.CURRENCY
             ? prompts.currency(playerId, kind, target.assetId(),
-                ignored -> player.sendMessage(messages.component(player, "ui-transfer-money-invalid")))
+                () -> player.sendMessage(messages.component(player, "ui-transfer-money-invalid")))
             : prompts.item(playerId, kind, target.marketId(),
-                ignored -> player.sendMessage(messages.component(player, "ui-transfer-item-invalid")));
+                () -> player.sendMessage(messages.component(player, "ui-transfer-item-invalid")));
     String prompt = target.kind() == TransferTarget.Kind.CURRENCY
         ? messages.text(player, "ui-transfer-money-prompt")
         : messages.text(player, "ui-transfer-item-prompt");

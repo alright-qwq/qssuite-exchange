@@ -17,11 +17,11 @@ class OrderEntryPromptTest {
     List<String> feedback = new ArrayList<>();
     OrderEntryPrompt prompts = new OrderEntryPrompt(contexts, () -> requestId);
     var handler = prompts.limit(
-        accountId, "diamond/default", OrderSide.BUY, feedback::add);
+        accountId, "diamond/default", OrderSide.BUY, () -> feedback.add("localized-invalid"));
 
     assertThat(handler.apply("not-an-order")).isFalse();
     assertThat(contexts.get(accountId)).isEmpty();
-    assertThat(feedback).containsExactly("Enter quantity and a positive limit price, for example: 2 100.00");
+    assertThat(feedback).containsExactly("localized-invalid");
 
     assertThat(handler.apply("2 100.00")).isTrue();
     assertThat(contexts.get(accountId)).get().satisfies(request -> {
@@ -39,7 +39,7 @@ class OrderEntryPromptTest {
     OrderEntryPrompt prompts = new OrderEntryPrompt(contexts, UUID::randomUUID);
 
     assertThat(prompts.market(accountId, "diamond/default", OrderSide.SELL,
-        ignored -> {}).apply("3 90.00")).isTrue();
+        () -> {}).apply("3 90.00")).isTrue();
 
     assertThat(contexts.get(accountId)).get().satisfies(request -> {
       assertThat(request.order().quantity()).isEqualTo(3);

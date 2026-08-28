@@ -3,7 +3,6 @@ package com.ghostchu.quickshop.addon.exchange.ui;
 import com.ghostchu.quickshop.addon.exchange.command.ExchangeMenuRequest;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -18,29 +17,26 @@ final class AssetTransferPrompt {
   }
 
   Function<String, Boolean> currency(UUID accountId, ExchangeMenuRequest.TransferKind kind,
-                                     String currencyId, Consumer<String> feedback) {
+                                     String currencyId, Runnable feedback) {
     Objects.requireNonNull(feedback, "feedback");
     return raw -> store(() -> AssetTransferInput.currency(
-        requestIds.get(), accountId, kind, currencyId, raw), feedback,
-        "Enter a positive money amount.");
+        requestIds.get(), accountId, kind, currencyId, raw), feedback);
   }
 
   Function<String, Boolean> item(UUID accountId, ExchangeMenuRequest.TransferKind kind,
-                                 String marketId, Consumer<String> feedback) {
+                                 String marketId, Runnable feedback) {
     Objects.requireNonNull(feedback, "feedback");
     return raw -> store(() -> AssetTransferInput.item(
-        requestIds.get(), accountId, kind, marketId, raw), feedback,
-        "Enter a positive whole item quantity.");
+        requestIds.get(), accountId, kind, marketId, raw), feedback);
   }
 
-  private boolean store(Supplier<ExchangeMenuRequest> request, Consumer<String> feedback,
-                        String errorMessage) {
+  private boolean store(Supplier<ExchangeMenuRequest> request, Runnable feedback) {
     try {
       ExchangeMenuRequest parsed = request.get();
       contexts.put(parsed.accountId(), parsed);
       return true;
     } catch (IllegalArgumentException invalid) {
-      feedback.accept(errorMessage);
+      feedback.run();
       return false;
     }
   }

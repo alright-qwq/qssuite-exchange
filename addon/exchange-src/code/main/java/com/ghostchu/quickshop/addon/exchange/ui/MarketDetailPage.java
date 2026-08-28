@@ -511,9 +511,9 @@ final class MarketDetailPage {
     }
     Function<String, Boolean> handler = type == OrderType.LIMIT
         ? prompts.limit(player.getUniqueId(), row.marketId(), side,
-            ignored -> player.sendMessage(messages.component(player, "ui-order-limit-invalid")))
+            () -> player.sendMessage(messages.component(player, "ui-order-limit-invalid")))
         : prompts.market(player.getUniqueId(), row.marketId(), side,
-            ignored -> player.sendMessage(messages.component(player, "ui-order-market-invalid")));
+            () -> player.sendMessage(messages.component(player, "ui-order-market-invalid")));
     String prompt = orderPrompt(player, row, side, type);
     GuiChatInputManager.getInstance().requestInput(player, handler, prompt, ExchangeMenu.NAME,
         ExchangeMenuPage.ORDER_CONFIRM.page());

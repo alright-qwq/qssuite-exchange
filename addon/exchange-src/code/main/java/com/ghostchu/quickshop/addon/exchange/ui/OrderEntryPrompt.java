@@ -10,11 +10,6 @@ import java.util.function.Supplier;
 
 /** Creates retryable chat handlers for limit and protected market orders. */
 final class OrderEntryPrompt {
-  static final String LIMIT_ERROR =
-      "Enter quantity and a positive limit price, for example: 2 100.00";
-  static final String MARKET_ERROR =
-      "Enter quantity and a positive protection price (worst acceptable), for example: 2 105.00";
-
   private final ExchangeMenuContextStore contexts;
   private final Supplier<UUID> requestIds;
 
@@ -24,27 +19,26 @@ final class OrderEntryPrompt {
   }
 
   Function<String, Boolean> limit(UUID accountId, String marketId, OrderSide side,
-                                  Consumer<String> feedback) {
+                                  Runnable feedback) {
     Objects.requireNonNull(feedback, "feedback");
     return raw -> store(() -> OrderEntryInput.limit(
-        requestIds.get(), accountId, marketId, side, raw), feedback, LIMIT_ERROR);
+        requestIds.get(), accountId, marketId, side, raw), feedback);
   }
 
   Function<String, Boolean> market(UUID accountId, String marketId, OrderSide side,
-                                   Consumer<String> feedback) {
+                                   Runnable feedback) {
     Objects.requireNonNull(feedback, "feedback");
     return raw -> store(() -> OrderEntryInput.market(
-        requestIds.get(), accountId, marketId, side, raw), feedback, MARKET_ERROR);
+        requestIds.get(), accountId, marketId, side, raw), feedback);
   }
 
-  private boolean store(Supplier<ExchangeMenuRequest> request, Consumer<String> feedback,
-                        String errorMessage) {
+  private boolean store(Supplier<ExchangeMenuRequest> request, Runnable feedback) {
     try {
       ExchangeMenuRequest parsed = request.get();
       contexts.put(parsed.accountId(), parsed);
       return true;
     } catch (IllegalArgumentException invalid) {
-      feedback.accept(errorMessage);
+      feedback.run();
       return false;
     }
   }
