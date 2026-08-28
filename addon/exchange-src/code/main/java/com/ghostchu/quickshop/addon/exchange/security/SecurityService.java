@@ -63,6 +63,10 @@ public final class SecurityService {
     if (totalSupply < 10) {
       throw new IllegalArgumentException("total supply must be at least 10");
     }
+    if (totalSupply / minimumUnit < 10) {
+      throw new IllegalArgumentException(
+          "total supply must be at least 10 tradeable units (total supply / minimum unit >= 10)");
+    }
     MarketDefinition definition = buildMarketDefinition(
         marketId, symbol, name, description, currencyId, basePrice, totalSupply, minimumUnit);
     Instant now = Instant.now();
@@ -446,6 +450,10 @@ public final class SecurityService {
       String marketId, String symbol, String name, String description, String currencyId,
       BigDecimal basePrice, long totalSupply, long minimumUnit) {
     BigDecimal one = BigDecimal.ONE;
+    if (totalSupply / minimumUnit < 10) {
+      throw new IllegalArgumentException(
+          "total supply must be at least 10 tradeable units (total supply / minimum unit >= 10)");
+    }
     long discovery = Math.min(totalSupply, Math.max(totalSupply / 100, minimumUnit * 10));
     MarketDefinition.StructuralRules structural = new MarketDefinition.StructuralRules(
         currencyId, basePrice, one, basePrice.multiply(new BigDecimal("1000")),

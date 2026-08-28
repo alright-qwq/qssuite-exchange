@@ -168,6 +168,27 @@ class SecurityServiceTest {
   }
 
   @Test
+  void createRejectsSupplyBelowTenTradeableUnits() throws Exception {
+    UUID actor = UUID.randomUUID();
+
+    // 10 units of supply with a 2-unit minimum is only 5 tradeable units; the market rules
+    // require a discovery quantity of at least 10x the minimum unit, so this must fail early
+    // with a clear message instead of an opaque structural-rules error.
+    assertThatThrownBy(() -> service.create(actor, UUID.randomUUID(), marketId, "ALPHA",
+        "Alpha", "too few tradeable units", "default", new BigDecimal("10.00"), 10, 2))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("10 tradeable units");
+    assertThat((Boolean) repository.inTransaction(
+        tx -> tx.existingSecurityDefinition(marketId).isPresent())).isFalse();
+
+    // Exactly 10 tradeable units is still accepted.
+    SecurityMutationResult accepted = service.create(actor, UUID.randomUUID(), marketId,
+        "ALPHA", "Alpha", "exactly ten tradeable units", "default",
+        new BigDecimal("10.00"), 20, 2);
+    assertThat(accepted.replayed()).isFalse();
+  }
+
+  @Test
   void issueCreditsTargetAndIsIdempotentByRequest() throws Exception {
     UUID actor = UUID.randomUUID();
     UUID owner = UUID.randomUUID();

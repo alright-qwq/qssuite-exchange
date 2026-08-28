@@ -68,6 +68,9 @@ public final class Main extends JavaPlugin implements Listener {
       } else {
         getLogger().info("QuickShop Exchange is disabled in config.yml");
       }
+      // Keep /qse reload alive even while disabled or after a config parse failure so the
+      // operator can flip enabled back on without restarting the server.
+      installRecoveryEntrypoints();
       return;
     }
     int configVersion = getConfig().getInt("config-version", 1);
@@ -201,24 +204,33 @@ public final class Main extends JavaPlugin implements Listener {
       if (chatInputs != null) {
         chatInputs.shutdown();
       }
-      ExchangeRuntime activeRuntime = runtime;
-      ExchangeRuntimeFactory activeFactory = runtimeFactory;
       mainListenerRegistered = false;
       org.bukkit.event.HandlerList.unregisterAll((org.bukkit.event.Listener) this);
-      ShutdownSequence.close(this::unregisterPlayerEntrypoints,
-          () -> {
-            if (activeRuntime != null) {
-              activeRuntime.close();
-            }
-          }, failure -> getLogger().log(Level.SEVERE, "Exchange shutdown cleanup failed", failure));
-      runtime = null;
-      runtimeFactory = null;
-      if (activeFactory != null) {
-        try {
-          activeFactory.closeListeners();
-        } catch (Exception cleanupFailure) {
-          getLogger().log(Level.SEVERE, "Exchange listener cleanup failed", cleanupFailure);
-        }
+      closeRuntime();
+    }
+  }
+
+  /**
+   * Closes the active runtime and factory listeners, unregisters player entry points and resets
+   * the runtime fields. Safe to call when nothing is running; leaves the plugin itself enabled so
+   * a later {@code /qse reload} can start the exchange again.
+   */
+  private void closeRuntime() {
+    ExchangeRuntime activeRuntime = runtime;
+    ExchangeRuntimeFactory activeFactory = runtimeFactory;
+    ShutdownSequence.close(this::unregisterPlayerEntrypoints,
+        () -> {
+          if (activeRuntime != null) {
+            activeRuntime.close();
+          }
+        }, failure -> getLogger().log(Level.SEVERE, "Exchange shutdown cleanup failed", failure));
+    runtime = null;
+    runtimeFactory = null;
+    if (activeFactory != null) {
+      try {
+        activeFactory.closeListeners();
+      } catch (Exception cleanupFailure) {
+        getLogger().log(Level.SEVERE, "Exchange listener cleanup failed", cleanupFailure);
       }
     }
   }
@@ -234,6 +246,14 @@ public final class Main extends JavaPlugin implements Listener {
    */
   public ReloadResult reloadExchangeConfig() {
     synchronized (lifecycleLock) {
+      reloadConfig();
+      if (!getConfig().getBoolean("enabled", false)) {
+        closeRuntime();
+        // Keep /qse reload available so the operator can re-enable without a restart.
+        installRecoveryEntrypoints();
+        getLogger().info("QuickShop Exchange is disabled in config.yml");
+        return new ReloadResult(true, null);
+      }
       ExchangeRuntime activeRuntime = runtime;
       ExchangeRuntimeFactory factory = runtimeFactory;
       if (activeRuntime == null) {
@@ -252,7 +272,6 @@ public final class Main extends JavaPlugin implements Listener {
         }
       }
       try {
-        reloadConfig();
         factory.reloadConfig();
         rewirePlayerEntrypoints();
         getLogger().info("Exchange configuration reloaded successfully");
