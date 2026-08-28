@@ -605,6 +605,18 @@ public final class JdbcExchangeRepository
   }
 
   @Override
+  public long openAlertCount() throws SQLException {
+    try (Connection connection = connections.open();
+         PreparedStatement query = connection.prepareStatement(
+             "SELECT COUNT(*) FROM " + tables.auditAlerts()
+                 + " WHERE acknowledged_at IS NULL")) {
+      try (ResultSet result = query.executeQuery()) {
+        return result.next() ? result.getLong(1) : 0L;
+      }
+    }
+  }
+
+  @Override
   public void acknowledgeAlert(UUID alertId, Instant acknowledgedAt) throws SQLException {
     Objects.requireNonNull(alertId, "alertId");
     Objects.requireNonNull(acknowledgedAt, "acknowledgedAt");

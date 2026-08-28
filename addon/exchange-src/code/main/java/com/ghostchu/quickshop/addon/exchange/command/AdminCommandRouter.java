@@ -261,11 +261,9 @@ public final class AdminCommandRouter {
                 + alert.type() + "@" + alert.marketId()
                 + " " + alert.createdAt() + " evidence={" + alert.payload() + "}")
             .collect(java.util.stream.Collectors.joining(" | "));
-    long openAlerts = status.recentAlerts().stream()
-        .filter(alert -> alert.acknowledgedAt() == null).count();
     String pending = "pending-reviews=" + status.pendingTransferReviews().size();
-    String open = "open-alerts=" + openAlerts;
-    if (openAlerts > 0) {
+    String open = "open-alerts=" + status.openAlertCount();
+    if (status.openAlertCount() > 0) {
       open = "§c⚠ " + open + " §r";
     }
     return "markets=" + metrics + "\nalerts=" + alerts + "\n" + pending + "\n" + open;

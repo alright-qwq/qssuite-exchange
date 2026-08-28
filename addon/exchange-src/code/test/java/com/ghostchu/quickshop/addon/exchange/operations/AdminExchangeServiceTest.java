@@ -76,7 +76,25 @@ class AdminExchangeServiceTest {
     assertThat(status.metrics().markets().get(fixture.rules().marketId()).queueLength())
         .isEqualTo(3);
     assertThat(status.recentAlerts()).containsExactly(alert);
+    assertThat(status.openAlertCount()).isEqualTo(1);
     assertThat(status.pendingTransferReviews()).isEmpty();
+  }
+
+  @Test
+  void auditStatusCountsEveryOpenAlertBeyondTheRecentPageWindow() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    for (int index = 0; index < 25; index++) {
+      fixture.repository().insertAuditAlert(new AuditAlert(
+          UUID.randomUUID(), fixture.rules().marketId(), null,
+          "HIGH_CANCEL_PLACE_RATIO", "MEDIUM", "ratio=1.0", Instant.now(), null));
+    }
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository());
+
+    AdminExchangeService.AuditStatus status = admin.auditStatus();
+
+    assertThat(status.recentAlerts()).hasSize(20);
+    assertThat(status.openAlertCount()).isEqualTo(25);
   }
 
   @Test

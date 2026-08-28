@@ -73,6 +73,11 @@ public interface ExchangeRepository {
     throw new UnsupportedOperationException("audit alerts are not supported by this repository");
   }
 
+  /** Counts all alerts that have not been acknowledged, regardless of page size. */
+  default long openAlertCount() throws SQLException {
+    throw new UnsupportedOperationException("audit alerts are not supported by this repository");
+  }
+
   /** Marks one alert acknowledged at the given instant; no-op when the alert is unknown. */
   default void acknowledgeAlert(UUID alertId, Instant acknowledgedAt) throws SQLException {
     throw new UnsupportedOperationException("audit alerts are not supported by this repository");

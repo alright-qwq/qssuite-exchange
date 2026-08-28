@@ -106,11 +106,14 @@ public final class AdminExchangeService {
 
   /** Combined operational health view: metrics, recent alerts and pending transfer reviews. */
   public record AuditStatus(MetricSnapshot metrics, List<AuditAlert> recentAlerts,
-                            List<TransferRecord> pendingTransferReviews) {
+                            long openAlertCount, List<TransferRecord> pendingTransferReviews) {
     public AuditStatus {
       Objects.requireNonNull(metrics, "metrics");
       recentAlerts = List.copyOf(recentAlerts);
       pendingTransferReviews = List.copyOf(pendingTransferReviews);
+      if (openAlertCount < 0) {
+        throw new IllegalArgumentException("open alert count must be non-negative");
+      }
     }
   }
 
@@ -120,6 +123,7 @@ public final class AdminExchangeService {
     return new AuditStatus(
         snapshot == null ? new MetricSnapshot(java.util.Map.of()) : snapshot.snapshot(),
         store.recentAlerts(20),
+        store.openAlertCount(),
         pendingTransferReviews());
   }
 
