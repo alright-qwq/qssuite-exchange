@@ -3,7 +3,7 @@ en-US:
   permission-denied: You do not have permission for this exchange action.
   rollout-not-allowed: This account is not included in the current exchange rollout.
   command-invalid: The exchange command or its arguments are invalid.
-  command-help: 'Exchange commands:\n/open: market list\n/market <id>: market detail\n/order limit|market <buy|sell> ...: place order\n/cancel <order-id>: cancel order\n/orders: my orders\n/assets: balances and transfers\n/history: account history\n/stock <symbol>: open a concept stock\n/deposit|withdraw money|item ...: deposit or withdraw\n/reload: reload exchange configuration (admin)'
+  command-help: 'Exchange commands:\n/qse open: market list\n/qse market <id>: market detail\n/qse order limit|market <buy|sell> ...: place order\n/qse cancel <order-id>: cancel order\n/qse orders: my orders\n/qse assets: balances and transfers\n/qse history: account history\n/qse stock <symbol>: open a concept stock\n/qse deposit|withdraw money|item ...: deposit or withdraw\n/qse reload: reload exchange configuration (admin)'
   market-not-open: This market currently accepts queries and cancellations only.
   request-accepted: 'Exchange request accepted: <requestId>'
   request-ready: 'Exchange request ready for confirmation: <requestId>'
@@ -248,7 +248,7 @@ zh-CN:
   permission-denied: '你没有执行此交易所操作的权限。'
   rollout-not-allowed: '你的账号尚未加入当前交易所灰度名单。'
   command-invalid: '交易所命令或参数无效。'
-  command-help: '交易所命令：\n/open：市场列表\n/market <市场ID>：市场详情\n/order limit|market <买入|卖出> ...：下单\n/cancel <订单ID>：撤单\n/orders：我的订单\n/assets：资产与转账\n/history：账户历史\n/stock <代码>：打开概念股\n/deposit|withdraw money|item ...：存入或取出\n/reload：重载交易所配置（管理员）'
+  command-help: '交易所命令：\n/qse open：市场列表\n/qse market <市场ID>：市场详情\n/qse order limit|market <买入|卖出> ...：下单\n/qse cancel <订单ID>：撤单\n/qse orders：我的订单\n/qse assets：资产与转账\n/qse history：账户历史\n/qse stock <代码>：打开概念股\n/qse deposit|withdraw money|item ...：存入或取出\n/qse reload：重载交易所配置（管理员）'
   market-not-open: '当前市场只允许查询和撤单。'
   request-accepted: '交易请求已受理：<requestId>'
   request-ready: '交易请求已准备，等待确认：<requestId>'
