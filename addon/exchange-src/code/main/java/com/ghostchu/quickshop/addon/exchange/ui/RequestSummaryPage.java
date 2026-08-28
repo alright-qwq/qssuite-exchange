@@ -131,6 +131,24 @@ final class RequestSummaryPage {
                 ExchangeMenuPage.ORDERS.page(), click.player());
           })).withSlot(0).build());
     }
+    page.addIcon(playerId, new IconBuilder(
+        ExchangeMenuPlatform.stack().of("CLOCK", 1)
+            .customName(messages.component(player, "ui-nav-history")))
+        .withActions(new RunnableAction(click -> {
+          contexts.put(playerId, ExchangeMenuRequest.page(
+              ExchangeMenuPage.HISTORY.menuName()));
+          MenuManager.instance().open(ExchangeMenu.NAME,
+              ExchangeMenuPage.HISTORY.page(), click.player());
+        })).withSlot(1).build());
+    page.addIcon(playerId, new IconBuilder(
+        ExchangeMenuPlatform.stack().of("CHEST", 1)
+            .customName(messages.component(player, "ui-nav-assets")))
+        .withActions(new RunnableAction(click -> {
+          contexts.put(playerId, ExchangeMenuRequest.page(
+              ExchangeMenuPage.ASSETS.menuName()));
+          MenuManager.instance().open(ExchangeMenu.NAME,
+              ExchangeMenuPage.ASSETS.page(), click.player());
+        })).withSlot(2).build());
     if (submitter != null && request.requestId() != null
         && (request.order() != null || request.orderId() != null || request.transfer() != null)) {
       IconBuilder confirm = new IconBuilder(ExchangeMenuPlatform.stack().of("LIME_CONCRETE", 1)

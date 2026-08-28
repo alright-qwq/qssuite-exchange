@@ -79,6 +79,7 @@ final class MarketListPage {
     addFilterControl(page, player);
     addSortControl(page, player);
     addNavigation(page, player, 0, "CHEST", "ui-nav-assets", ExchangeMenuPage.ASSETS);
+    addNavigation(page, player, 5, "CLOCK", "ui-nav-history", ExchangeMenuPage.HISTORY);
     addNavigation(page, player, 8, "WRITABLE_BOOK", "ui-nav-orders", ExchangeMenuPage.ORDERS);
     int slot = 9;
     ExchangeMenuRequest opened = contexts.get(playerId).orElse(null);
@@ -149,10 +150,15 @@ final class MarketListPage {
       }
       lore.add(changeLine);
       String material = "CHEST";
-      if (row.status() == MarketStatus.OPEN
-          && "VIRTUAL_SECURITY".equals(row.assetType())) {
-        material = "EMERALD";
-      } else if (row.status() != MarketStatus.OPEN) {
+      if (row.status() == MarketStatus.OPEN) {
+        if ("VIRTUAL_SECURITY".equals(row.assetType())) {
+          material = "EMERALD";
+        } else if (row.change24h() != null && row.change24h().signum() > 0) {
+          material = "GREEN_CONCRETE";
+        } else if (row.change24h() != null && row.change24h().signum() < 0) {
+          material = "RED_CONCRETE";
+        }
+      } else {
         material = "BARRIER";
       }
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(material, 1)
@@ -193,15 +199,33 @@ final class MarketListPage {
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(
         filter == AssetFilter.SECURITY ? "PAPER"
             : filter == AssetFilter.ITEM ? "CHEST" : "HOPPER", 1)
-        .customName(messages.component(player, "ui-filter-title", filter.name()))
+        .customName(messages.component(player, "ui-filter-title",
+            filterLabel(player, filter)))
         .lore(List.of(messages.component(player, "ui-filter-hint"),
-            messages.component(player, "ui-filter-current", filter.name()))))
+            messages.component(player, "ui-filter-current",
+                filterLabel(player, filter)))))
         .withActions(new RunnableAction(click -> {
           contexts.get(playerId).ifPresent(opened -> {
             assetFilters.put(playerId, filter.next());
             refresh(page, player, opened);
           });
         })).withSlot(6).build());
+  }
+
+  private String filterLabel(Player player, AssetFilter filter) {
+    return messages.text(player, switch (filter) {
+      case ALL -> "ui-filter-all";
+      case SECURITY -> "ui-filter-security";
+      case ITEM -> "ui-filter-item";
+    });
+  }
+
+  private String sortLabel(Player player, MarketListSnapshot.SortMode mode) {
+    return messages.text(player, switch (mode) {
+      case NOTIONAL -> "ui-sort-notional";
+      case CHANGE -> "ui-sort-change";
+      case LAST -> "ui-sort-last";
+    });
   }
 
   private enum AssetFilter {
@@ -221,9 +245,11 @@ final class MarketListPage {
     MarketListSnapshot.SortMode mode =
         sortModes.getOrDefault(playerId, MarketListSnapshot.SortMode.NOTIONAL);
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("COMPARATOR", 1)
-        .customName(messages.component(player, "ui-sort-title", mode.name()))
+        .customName(messages.component(player, "ui-sort-title",
+            sortLabel(player, mode)))
         .lore(List.of(messages.component(player, "ui-sort-hint"),
-            messages.component(player, "ui-sort-current", mode.name()))))
+            messages.component(player, "ui-sort-current",
+                sortLabel(player, mode)))))
         .withActions(new RunnableAction(click -> {
           contexts.get(playerId).ifPresent(opened -> {
             sortModes.put(playerId, mode.next());

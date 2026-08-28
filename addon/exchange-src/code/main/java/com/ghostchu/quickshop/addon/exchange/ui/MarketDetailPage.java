@@ -300,8 +300,8 @@ final class MarketDetailPage {
           .withSlot(slot).build());
       return;
     }
-    String material = row.executable() ? (bid ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE")
-        : "GRAY_STAINED_GLASS_PANE";
+    String material = row.executable() ? (bid ? "GREEN_CONCRETE" : "RED_CONCRETE")
+        : (bid ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE");
     int scale = marketPriceScale(market.marketId());
     java.util.ArrayList<Component> lore = new java.util.ArrayList<>(List.of(
         messages.component(player, "ui-depth-price", messages.formatCurrency(row.price(), scale)),
@@ -333,9 +333,9 @@ final class MarketDetailPage {
         continue;
       }
       String material = switch (row.direction()) {
-        case UP -> "LIME_STAINED_GLASS_PANE";
-        case DOWN -> "RED_STAINED_GLASS_PANE";
-        case FLAT -> "YELLOW_STAINED_GLASS_PANE";
+        case UP -> "GREEN_CONCRETE";
+        case DOWN -> "RED_CONCRETE";
+        case FLAT -> "YELLOW_CONCRETE";
       };
       var candle = row.candle();
       java.math.BigDecimal change = candle.close().subtract(candle.open());
@@ -355,7 +355,8 @@ final class MarketDetailPage {
               messages.formatCurrency(candle.close(), scale)),
           messages.component(player, "ui-trend-change", change.stripTrailingZeros().toPlainString(),
               changePercent.toPlainString()),
-          messages.component(player, "ui-trend-volume", candle.volume())));
+          messages.component(player, "ui-trend-volume", candle.volume()),
+          messages.component(player, "ui-trend-strength", row.strength())));
       page.addIcon(player.getUniqueId(), new IconBuilder(ExchangeMenuPlatform.stack().of(material,
           Math.max(1, row.strength())).customName(messages.component(player,
               "ui-trend-title", messages.text(player, directionKey(row.direction())))).lore(lore))
@@ -409,7 +410,7 @@ final class MarketDetailPage {
           messages.component(player, "ui-market-recent-trade-time",
               messages.relativeTime(trade.executedAt())));
       page.addIcon(player.getUniqueId(), new IconBuilder(
-          ExchangeMenuPlatform.stack().of(buy ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE", 1)
+          ExchangeMenuPlatform.stack().of(buy ? "GREEN_CONCRETE" : "RED_CONCRETE", 1)
               .customName(messages.component(player, "ui-market-recent-trade-title",
                   buy ? messages.text(player, "ui-market-recent-active-buy")
                       : messages.text(player, "ui-market-recent-active-sell"),

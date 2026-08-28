@@ -89,6 +89,7 @@ en-US:
   ui-nav-markets: Markets
   ui-nav-assets: Assets
   ui-nav-orders: My orders
+  ui-nav-history: History
   ui-overview-title: Market overview
   ui-overview-markets: 'Markets: <0>'
   ui-overview-breadth: '24h rising / falling: <0> / <1>'
@@ -100,9 +101,15 @@ en-US:
   ui-sort-title: 'Sort: <0>'
   ui-sort-hint: 'Click to switch sorting'
   ui-sort-current: 'Current: <0>'
+  ui-sort-notional: Turnover
+  ui-sort-change: 24h change
+  ui-sort-last: Last price
   ui-filter-title: 'Filter: <0>'
   ui-filter-hint: 'Click to switch asset filter'
   ui-filter-current: 'Current: <0>'
+  ui-filter-all: All assets
+  ui-filter-security: Virtual stocks
+  ui-filter-item: Items
   ui-depth-bid: Bid depth
   ui-depth-ask: Ask depth
   ui-depth-empty: No depth
@@ -130,6 +137,7 @@ en-US:
   ui-trend-close: 'Close: <0>'
   ui-trend-change: 'Change: <0> (<1>%)'
   ui-trend-volume: 'Volume: <0>'
+  ui-trend-strength: 'Volume bar: <0>/8'
   ui-assets-available: 'Available: <0>'
   ui-assets-frozen: 'Frozen: <0>'
   ui-assets-virtual-security: Virtual security (ledger-only, cannot deposit or withdraw)
@@ -147,8 +155,8 @@ en-US:
   ui-assets-transfer-status: 'Status: <0>'
   ui-assets-transfers-empty: No recent transfers
   ui-assets-transfers-page: 'Transfers page <0>'
-  ui-assets-more-currency: '+<0> more currency assets in the history page'
-  ui-assets-more-securities: '+<0> more virtual securities in the market list'
+  ui-assets-more-currency: '+<0> more currency assets - click to view transfer history'
+  ui-assets-more-securities: '+<0> more virtual securities - click to open the market list'
   ui-transfer-money-prompt: Enter a positive money amount in chat.
   ui-transfer-item-prompt: Enter a positive whole item quantity in chat.
   ui-transfer-money-invalid: Enter a positive money amount.
@@ -186,6 +194,7 @@ en-US:
   ui-history-page: 'History page <0>'
   ui-history-empty: No history entries.
   ui-orders-empty: No open orders.
+  ui-orders-empty-go-markets: 'Browse markets to place an order'
   ui-confirm-not-selected: No exchange request is selected.
   ui-confirm-order-title: 'Confirm <0> order'
   ui-confirm-transfer-title: 'Confirm <0> transfer'
@@ -334,6 +343,7 @@ zh-CN:
   ui-nav-markets: 市场列表
   ui-nav-assets: 我的资产
   ui-nav-orders: 我的订单
+  ui-nav-history: 历史记录
   ui-overview-title: 全服大盘
   ui-overview-markets: '市场数：<0>'
   ui-overview-breadth: '24 小时上涨 / 下跌：<0> / <1>'
@@ -345,9 +355,15 @@ zh-CN:
   ui-sort-title: '排序：<0>'
   ui-sort-hint: '点击切换排序方式'
   ui-sort-current: '当前：<0>'
+  ui-sort-notional: 成交额
+  ui-sort-change: 24 小时涨跌
+  ui-sort-last: 最新价
   ui-filter-title: '筛选：<0>'
   ui-filter-hint: '点击切换资产类型筛选'
   ui-filter-current: '当前：<0>'
+  ui-filter-all: 全部资产
+  ui-filter-security: 概念股
+  ui-filter-item: 物品
   ui-depth-bid: 买盘深度
   ui-depth-ask: 卖盘深度
   ui-depth-empty: 暂无深度
@@ -375,6 +391,7 @@ zh-CN:
   ui-trend-close: '收盘：<0>'
   ui-trend-change: '涨跌：<0>（<1>%）'
   ui-trend-volume: '成交量：<0>'
+  ui-trend-strength: '成交量柱：<0>/8'
   ui-assets-available: '可用：<0>'
   ui-assets-frozen: '冻结：<0>'
   ui-assets-virtual-security: '虚拟证券（纯账本，不可充值/提现）'
@@ -392,8 +409,8 @@ zh-CN:
   ui-assets-transfer-status: '状态：<0>'
   ui-assets-transfers-empty: 暂无转账记录
   ui-assets-transfers-page: '转账第 <0> 页'
-  ui-assets-more-currency: '另有 <0> 项货币资产，请在历史页面查看'
-  ui-assets-more-securities: '另有 <0> 项虚拟证券，请在市场列表查看'
+  ui-assets-more-currency: '另有 <0> 项货币资产，点击查看转账历史'
+  ui-assets-more-securities: '另有 <0> 项虚拟证券，点击打开市场列表'
   ui-transfer-money-prompt: '请在聊天栏输入正数金额。'
   ui-transfer-item-prompt: '请在聊天栏输入正整数物品数量。'
   ui-transfer-money-invalid: '请输入正数金额。'
@@ -431,6 +448,7 @@ zh-CN:
   ui-history-page: '历史第 <0> 页'
   ui-history-empty: '暂无历史记录。'
   ui-orders-empty: '暂无挂单。'
+  ui-orders-empty-go-markets: '前往市场列表下单'
   ui-confirm-not-selected: '尚未选择需要确认的交易请求。'
   ui-confirm-order-title: '确认 <0> 订单'
   ui-confirm-transfer-title: '确认 <0> 转账'

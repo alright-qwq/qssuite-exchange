@@ -91,7 +91,19 @@ final class MyOrdersPage {
     addMarketsNavigation(page, player);
     if (orders.isEmpty()) {
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
-          .customName(messages.component(player, "ui-orders-empty"))).withSlot(22).build());
+          .customName(messages.component(player, "ui-orders-empty")))
+          .withActions(new RunnableAction(click -> {
+            contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName()));
+            MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKETS.page(),
+                click.player());
+          })).withSlot(22).build());
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("COMPASS", 1)
+          .customName(messages.component(player, "ui-orders-empty-go-markets")))
+          .withActions(new RunnableAction(click -> {
+            contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName()));
+            MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKETS.page(),
+                click.player());
+          })).withSlot(31).build());
     }
     int slot = 9;
     for (ExchangeTransaction.PersistedOrder persisted
@@ -130,7 +142,7 @@ final class MyOrdersPage {
       }
       boolean buying = order.side() == OrderSide.BUY;
       IconBuilder icon = new IconBuilder(ExchangeMenuPlatform.stack().of(
-          buying ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE", 1)
+          buying ? "GREEN_CONCRETE" : "RED_CONCRETE", 1)
           .customName(messages.component(player, "ui-order-title", order.side(),
               views.marketDisplayName(order.marketId())))
           .lore(lore));
@@ -168,6 +180,20 @@ final class MyOrdersPage {
           MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKETS.page(),
               click.player());
         })).withSlot(0).build());
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CHEST", 1)
+        .customName(messages.component(player, "ui-nav-assets")))
+        .withActions(new RunnableAction(click -> {
+          contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.ASSETS.menuName()));
+          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ASSETS.page(),
+              click.player());
+        })).withSlot(1).build());
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
+        .customName(messages.component(player, "ui-nav-history")))
+        .withActions(new RunnableAction(click -> {
+          contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.HISTORY.menuName()));
+          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.HISTORY.page(),
+              click.player());
+        })).withSlot(2).build());
   }
 
   private void addNavigation(PlayerInstancePage page, Player player, int slot, String material,

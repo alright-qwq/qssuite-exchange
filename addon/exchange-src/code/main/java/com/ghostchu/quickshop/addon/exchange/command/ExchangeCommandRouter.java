@@ -123,7 +123,12 @@ public final class ExchangeCommandRouter {
         return;
       }
       try {
-        actor.openMenu(ExchangeMenuRequest.market(args[1]));
+        String marketId = resolveMarketOrSymbol(args[1]);
+        if (marketId == null || marketId.isBlank()) {
+          invalid(actor);
+          return;
+        }
+        actor.openMenu(ExchangeMenuRequest.market(marketId));
       } catch (IllegalArgumentException invalid) {
         invalid(actor);
       }
@@ -161,7 +166,6 @@ public final class ExchangeCommandRouter {
         invalid(actor);
         return;
       }
-      actor.message("request-ready", requestIds.get());
       actor.openMenu(ExchangeMenuRequest.market(marketId));
       return;
     }
@@ -318,6 +322,11 @@ public final class ExchangeCommandRouter {
         || actor.hasPermission("quickshop.exchange.admin.recovery")
         || actor.hasPermission("quickshop.exchange.admin.audit")
         || actor.hasPermission("quickshop.exchange.admin.stock");
+  }
+
+  private String resolveMarketOrSymbol(String raw) {
+    String resolved = symbolToMarketId.apply(raw);
+    return resolved == null || resolved.isBlank() ? raw : resolved;
   }
 
   private static void invalid(CommandActor actor) {

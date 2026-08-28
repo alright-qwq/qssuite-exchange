@@ -60,7 +60,8 @@ final class AssetsPage {
         views.accountTransfers(playerId, AssetTransferPaging.fetchLimit(), offset);
     CompletableFuture<Map<String, MarketQuote>> quotes = assets.thenApply(balances ->
         balances.stream()
-            .filter(balance -> balance.kind() == AccountAssetBalance.Kind.SECURITY)
+            .filter(balance -> balance.kind() == AccountAssetBalance.Kind.SECURITY
+                || balance.kind() == AccountAssetBalance.Kind.ITEM)
             .map(AccountAssetBalance::assetId)
             .toList()).thenCompose(views::marketQuotes);
     AssetPageSnapshot.combine(assets, transfers, quotes)
@@ -113,7 +114,12 @@ final class AssetsPage {
     if (merged.rows().size() > 12) {
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BOOK", 1)
           .customName(messages.component(player, "ui-assets-more-currency",
-              merged.rows().size() - 12))).withSlot(20).build());
+              merged.rows().size() - 12)))
+          .withActions(new RunnableAction(click -> {
+            contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.HISTORY.menuName()));
+            MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.HISTORY.page(),
+                click.player());
+          })).withSlot(20).build());
     }
     slot = 21;
     for (AssetPageRows.SecurityRow security : merged.securities()) {
@@ -143,7 +149,12 @@ final class AssetsPage {
     if (merged.securities().size() > 12) {
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("MAP", 1)
           .customName(messages.component(player, "ui-assets-more-securities",
-              merged.securities().size() - 12))).withSlot(32).build());
+              merged.securities().size() - 12)))
+          .withActions(new RunnableAction(click -> {
+            contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.MARKETS.menuName()));
+            MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKETS.page(),
+                click.player());
+          })).withSlot(32).build());
     }
     slot = 33;
     for (TransferRecord transfer : snapshot.transfers()) {
@@ -158,7 +169,12 @@ final class AssetsPage {
               transfer.status() + reason),
           messages.component(player, "ui-history-created-at",
               messages.relativeTime(transfer.updatedAt())));
-      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("HOPPER", 1)
+      String transferMaterial = switch (transfer.status()) {
+        case COMPLETED -> "GREEN_CONCRETE";
+        case FAILED -> "RED_CONCRETE";
+        default -> "HOPPER";
+      };
+      page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(transferMaterial, 1)
           .customName(messages.component(player, "ui-assets-transfer-title", transfer.status()))
           .lore(transferLore)).withSlot(slot++).build());
     }
@@ -198,18 +214,17 @@ final class AssetsPage {
 
   private void addTotalValue(PlayerInstancePage page, Player player, UUID playerId,
                              AssetPageRows.Merged merged, AssetPageSnapshot snapshot) {
-    // Aggregate values span markets; record the latest market scale for stable formatting.
-    if (!merged.rows().isEmpty()) {
-      marketPriceScale(merged.rows().getFirst().target().marketId());
-    } else if (!merged.securities().isEmpty()) {
-      marketPriceScale(merged.securities().getFirst().marketId());
-    }
     java.math.BigDecimal total = java.math.BigDecimal.ZERO;
     java.math.BigDecimal frozen = java.math.BigDecimal.ZERO;
     for (AssetPageRows.Row row : merged.rows()) {
       if (row.target().kind() == TransferTarget.Kind.CURRENCY) {
         total = total.add(row.available()).add(row.frozen());
         frozen = frozen.add(row.frozen());
+      } else if (row.target().kind() == TransferTarget.Kind.ITEM) {
+        java.math.BigDecimal value = itemValue(row, snapshot.quotes());
+        if (value != null) {
+          total = total.add(value);
+        }
       }
     }
     for (AssetPageRows.SecurityRow security : merged.securities()) {
@@ -218,12 +233,13 @@ final class AssetsPage {
         total = total.add(value);
       }
     }
+    int aggregateScale = aggregateScale(merged);
     java.util.List<Component> lore = new java.util.ArrayList<>(List.of(
         messages.component(player, "ui-assets-total-value-amount",
-            messages.formatCurrency(total))));
+            messages.formatCurrency(total, aggregateScale))));
     if (frozen.signum() > 0) {
       lore.add(messages.component(player, "ui-assets-total-value-frozen",
-          messages.formatCurrency(frozen)));
+          messages.formatCurrency(frozen, aggregateScale)));
     }
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("DIAMOND", 1)
         .customName(messages.component(player, "ui-assets-total-value")).lore(lore))
@@ -244,12 +260,37 @@ final class AssetsPage {
     return quote.lastPrice().multiply(quantity);
   }
 
+  private java.math.BigDecimal itemValue(AssetPageRows.Row row,
+                                         Map<String, MarketQuote> quotes) {
+    String marketId = row.target().marketId();
+    if (marketId == null || quotes == null) {
+      return null;
+    }
+    MarketQuote quote = quotes.get(marketId);
+    if (quote == null || quote.lastPrice() == null) {
+      return null;
+    }
+    return quote.lastPrice().multiply(row.available().add(row.frozen()));
+  }
+
   private int marketPriceScale(String marketId) {
     if (marketId == null) {
       return -1;
     }
     ExchangeViewService.MarketView market = views.market(marketId);
     int scale = market == null ? -1 : market.service().marketRules().priceScale();
+    return scale;
+  }
+
+  /** Uses the widest price scale across visible markets so mixed-scale totals do not truncate. */
+  private int aggregateScale(AssetPageRows.Merged merged) {
+    int scale = 2;
+    for (AssetPageRows.Row row : merged.rows()) {
+      scale = Math.max(scale, marketPriceScale(row.target().marketId()));
+    }
+    for (AssetPageRows.SecurityRow security : merged.securities()) {
+      scale = Math.max(scale, marketPriceScale(security.marketId()));
+    }
     return scale;
   }
 
@@ -262,6 +303,20 @@ final class AssetsPage {
           MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.MARKETS.page(),
               click.player());
         })).withSlot(0).build());
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("WRITABLE_BOOK", 1)
+        .customName(messages.component(player, "ui-nav-orders")))
+        .withActions(new RunnableAction(click -> {
+          contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.ORDERS.menuName()));
+          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.ORDERS.page(),
+              click.player());
+        })).withSlot(1).build());
+    page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("CLOCK", 1)
+        .customName(messages.component(player, "ui-nav-history")))
+        .withActions(new RunnableAction(click -> {
+          contexts.put(playerId, ExchangeMenuRequest.page(ExchangeMenuPage.HISTORY.menuName()));
+          MenuManager.instance().open(ExchangeMenu.NAME, ExchangeMenuPage.HISTORY.page(),
+              click.player());
+        })).withSlot(2).build());
   }
 
   private void requestTransfer(UUID playerId, TransferTarget target, boolean deposit) {

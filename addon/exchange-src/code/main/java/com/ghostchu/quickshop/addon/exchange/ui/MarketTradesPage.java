@@ -92,7 +92,10 @@ final class MarketTradesPage {
     page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("BOOK", 1)
         .customName(Component.text(title)).lore(headerLore)).withSlot(4).build());
     addNavigation(page, player, 0, "COMPASS", "ui-nav-markets", ExchangeMenuPage.MARKETS);
+    addNavigation(page, player, 1, "CHEST", "ui-nav-assets", ExchangeMenuPage.ASSETS);
     addNavigation(page, player, 2, "PAPER", "ui-market-back-detail", ExchangeMenuPage.MARKET_DETAIL);
+    addNavigation(page, player, 3, "WRITABLE_BOOK", "ui-nav-orders", ExchangeMenuPage.ORDERS);
+    addNavigation(page, player, 4, "CLOCK", "ui-nav-history", ExchangeMenuPage.HISTORY);
     if (trades.isEmpty()) {
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of("PAPER", 1)
           .customName(messages.component(player, "ui-market-recent-empty"))).withSlot(22).build());
@@ -110,7 +113,7 @@ final class MarketTradesPage {
           messages.component(player, "ui-market-recent-trade-time",
               messages.relativeTime(trade.executedAt())));
       page.addIcon(playerId, new IconBuilder(ExchangeMenuPlatform.stack().of(
-          buy ? "LIME_STAINED_GLASS_PANE" : "RED_STAINED_GLASS_PANE", 1)
+          buy ? "GREEN_CONCRETE" : "RED_CONCRETE", 1)
           .customName(messages.component(player, "ui-market-recent-trade-title",
               buy ? messages.text(player, "ui-market-recent-active-buy")
                   : messages.text(player, "ui-market-recent-active-sell"),
