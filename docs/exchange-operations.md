@@ -50,6 +50,8 @@
 /qse admin order cancel <orderId> <reason>
 /qse admin market pause <marketId> <reason>
 /qse admin market resume <marketId> <reason>
+/qse admin audit status
+/qse admin audit ack <alertId>
 /qse admin audit reconcile
 /qse admin audit export <from> <to>
 /qse admin transfer review list
@@ -59,6 +61,8 @@
 ```
 
 审计导出的时间接受 epoch 秒或 ISO-8601 时刻。配置的导出目录必须是相对于插件数据目录的路径。每次导出后会自动清理超过 `operations.audit-export-retention-days`（默认 90 天，0 表示永不清理）的本插件旧导出文件，只匹配插件自己生成的 `audit-*.csv`，不会触碰目录里的其他文件。变更型管理操作和对账与玩家结算一样，都运行在同一把写入围栏之后。
+
+`/qse admin audit status` 显示每个市场的队列长度与 p50/p95 撮合延迟、最近 20 条告警、待审核转账数，以及**全部**未确认告警数（`open-alerts`，不受最近 20 条窗口限制）。有未确认告警时 `open-alerts` 会带红色 ⚠ 前缀。`/qse admin audit ack <alertId>` 确认单条告警（幂等，写入审计记录）。
 
 对账差异会在对账事务中立即保护受影响的市场。物品/市场差异会暂停该市场；货币差异会暂停所有使用该货币的已配置市场。储备不足的订单或无法安全映射的差异会暂停所有已配置市场。每个受影响的市场都会收到 HIGH 级别 `RECONCILIATION_DIFFERENCE` 告警；`OPEN` 或 `HALTED` 市场会通过 CAS 转换到 `PAUSED`，并写入一条追加式 `RECONCILIATION_AUTO_PAUSE` 审计记录。在托管、账本和储备证据被查清、且随后一次对账平衡之前，不要恢复市场。
 
