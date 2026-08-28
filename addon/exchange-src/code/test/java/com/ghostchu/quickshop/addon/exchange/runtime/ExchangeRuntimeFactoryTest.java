@@ -2,14 +2,17 @@ package com.ghostchu.quickshop.addon.exchange.runtime;
 
 import com.ghostchu.quickshop.addon.exchange.config.MarketDefinition;
 import com.ghostchu.quickshop.addon.exchange.config.MarketRegistry;
+import com.ghostchu.quickshop.addon.exchange.core.model.MarketStatus;
 import com.ghostchu.quickshop.addon.exchange.marketdata.CandleAggregator;
 import com.ghostchu.quickshop.addon.exchange.marketdata.MarketDataService;
+import com.ghostchu.quickshop.addon.exchange.operations.AdminExchangeService;
 import com.ghostchu.quickshop.addon.exchange.persistence.ConnectionProvider;
 import com.ghostchu.quickshop.addon.exchange.persistence.JdbcExchangeRepository;
 import com.ghostchu.quickshop.addon.exchange.persistence.MigrationRunner;
 import com.ghostchu.quickshop.addon.exchange.persistence.SqlDialect;
 import com.ghostchu.quickshop.addon.exchange.persistence.SqliteTestDatabase;
 import com.ghostchu.quickshop.addon.exchange.persistence.TableNames;
+import com.ghostchu.quickshop.addon.exchange.service.ExchangeServiceFixture;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +21,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
@@ -212,6 +216,32 @@ class ExchangeRuntimeFactoryTest {
     assertThat(warnings)
         .anyMatch(message -> message.contains("orphaned_market")
             && message.contains("missing from markets.yml"));
+  }
+
+  @Test
+  void scheduledReconciliationPausesTheAffectedMarketThroughAdministration() throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    fixture.repository().inTransaction(tx -> {
+      tx.creditAvailableCurrency(UUID.randomUUID(), fixture.rules().currencyId(),
+          new BigDecimal("1.00"));
+      return null;
+    });
+    AdminExchangeService administration = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository());
+
+    var report = ExchangeRuntimeFactory.runScheduledReconciliation(administration);
+
+    assertThat(report).isNotNull();
+    assertThat(report.balanced()).isFalse();
+    MarketStatus status = fixture.repository().inTransaction(
+        tx -> tx.marketState(fixture.rules().marketId()).status());
+    assertThat(status).isEqualTo(MarketStatus.PAUSED);
+    assertThat(fixture.reconciliationAlertCount()).isEqualTo(1);
+  }
+
+  @Test
+  void scheduledReconciliationSkipsUntilAdministrationIsWired() throws Exception {
+    assertThat(ExchangeRuntimeFactory.runScheduledReconciliation(null)).isNull();
   }
 
   private static MarketDefinition fixtureDefinition(String tickSize, String makerRate,

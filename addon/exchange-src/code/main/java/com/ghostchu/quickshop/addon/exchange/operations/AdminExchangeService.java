@@ -236,6 +236,21 @@ public final class AdminExchangeService {
     });
   }
 
+  /**
+   * Runs a reconciliation with the same automatic market protection as the operator command, but
+   * without an idempotent request marker. This is the entry point for the background scheduled
+   * reconciliation: every cycle re-checks the ledger and custody books, and any detected
+   * difference pauses the affected markets and records a HIGH alert in the same transaction.
+   */
+  public ReconciliationReport reconcileAndProtect(UUID actorId) throws SQLException {
+    Objects.requireNonNull(actorId, "actorId");
+    return requireRepository().inTransaction(tx -> {
+      ReconciliationReport report = tx.reconcile();
+      protectAffectedMarkets(tx, actorId, report);
+      return report;
+    });
+  }
+
   public Path exportAudit(Instant fromInclusive, Instant toExclusive)
       throws SQLException, IOException {
     ExchangeRepository store = requireRepository();

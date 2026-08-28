@@ -302,6 +302,35 @@ class AdminExchangeServiceTest {
   }
 
   @Test
+  void scheduledReconciliationProtectionPausesTheAffectedMarketWithoutARequestMarker()
+      throws Exception {
+    ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();
+    fixture.repository().inTransaction(tx -> {
+      tx.creditAvailableCurrency(UUID.randomUUID(), fixture.rules().currencyId(),
+          new BigDecimal("1.00"));
+      return null;
+    });
+    UUID actor = UUID.randomUUID();
+    AdminExchangeService admin = new AdminExchangeService(
+        Map.of(fixture.rules().marketId(), fixture.service()), fixture.repository());
+
+    var report = admin.reconcileAndProtect(actor);
+
+    assertThat(report.balanced()).isFalse();
+    MarketStatus protectedStatus = fixture.repository().inTransaction(
+        tx -> tx.marketState(fixture.rules().marketId()).status());
+    assertThat(protectedStatus).isEqualTo(MarketStatus.PAUSED);
+    assertThat(fixture.reconciliationAlertCount()).isEqualTo(1);
+    assertThat(fixture.repository().auditRecords(Instant.EPOCH, Instant.now().plusSeconds(1)))
+        .singleElement()
+        .satisfies(record -> {
+          assertThat(record.actorId()).isEqualTo(actor);
+          assertThat(record.action()).isEqualTo("RECONCILIATION_AUTO_PAUSE");
+          assertThat(record.targetId()).isEqualTo(fixture.rules().marketId());
+        });
+  }
+
+  @Test
   void pausesAllMarketsWhenAReconciliationDifferenceCannotBeMappedToAConfiguredAsset()
       throws Exception {
     ExchangeServiceFixture fixture = ExchangeServiceFixture.sqlite();

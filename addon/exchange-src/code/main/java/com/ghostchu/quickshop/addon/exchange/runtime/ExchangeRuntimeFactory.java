@@ -286,7 +286,7 @@ public final class ExchangeRuntimeFactory {
         30L, 24L * 60L, TimeUnit.MINUTES);
     this.reconciliationIntervalMinutes = addon.getConfig().getInt(
         "operations.reconciliation-interval-minutes", 1440);
-    scheduleReconciliation(this.maintenance, repository);
+    scheduleReconciliation(this.maintenance);
     uiMaintenance.scheduleWithFixedDelay(marketData::publishPlayerUpdates,
         1L, 1L, TimeUnit.SECONDS);
     final ScheduledExecutorService maintenanceForClose = this.maintenance;
@@ -466,31 +466,51 @@ public final class ExchangeRuntimeFactory {
         if (previous != null) {
           previous.cancel(false);
         }
-        scheduleReconciliation(this.maintenance, this.repository);
+        scheduleReconciliation(this.maintenance);
       }
     }
   }
 
   /**
-   * Schedules the ledger reconciliation on the maintenance executor. Reload cancels the previous
-   * future and reschedules with the new interval, so changing or disabling reconciliation never
-   * requires a restart.
+   * Schedules the ledger reconciliation on the maintenance executor. Like the operator command,
+   * a detected difference pauses the affected markets and raises a HIGH alert, all in one
+   * transaction. Reload cancels the previous future and reschedules with the new interval, so
+   * changing or disabling reconciliation never requires a restart.
    */
-  private void scheduleReconciliation(
-      ScheduledExecutorService maintenance, JdbcExchangeRepository repository) {
+  private void scheduleReconciliation(ScheduledExecutorService maintenance) {
     int interval = this.reconciliationIntervalMinutes;
     if (interval <= 0 || maintenance == null || maintenance.isShutdown()) {
       return;
     }
     this.reconciliationTask = maintenance.scheduleWithFixedDelay(() -> runWhileOwned(
         database.writer(), () -> {
-          com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport report =
-              repository.reconcile();
-          if (!report.balanced()) {
-            addon.getLogger().warning("Exchange reconciliation detected differences: "
-                + report);
+          try {
+            com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport report =
+                runScheduledReconciliation(this.administration);
+            if (report != null && !report.balanced()) {
+              addon.getLogger().warning("Exchange reconciliation detected differences and paused "
+                  + "the affected markets: " + report);
+            }
+          } catch (SQLException failure) {
+            // Best-effort maintenance: the next scheduled cycle retries without a restart.
+            addon.getLogger().warning("Exchange scheduled reconciliation failed and will retry "
+                + "next cycle: " + failure.getMessage());
           }
         }), 15L, interval, TimeUnit.MINUTES);
+  }
+
+  /**
+   * Executes one scheduled reconciliation cycle through the administration service so that the
+   * same protection (auto-pause, audit record, HIGH alert) applies as for the operator command.
+   * Returns {@code null} when the runtime is still starting up and administration is not yet
+   * wired; the next scheduled cycle retries.
+   */
+  static com.ghostchu.quickshop.addon.exchange.ledger.ReconciliationReport
+      runScheduledReconciliation(AdminExchangeService administration) throws SQLException {
+    if (administration == null) {
+      return null;
+    }
+    return administration.reconcileAndProtect(UUID.randomUUID());
   }
 
   /**
