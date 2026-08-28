@@ -46,8 +46,27 @@ public final class PlayerOperationSerialiser implements AutoCloseable {
 
   @Override
   public void close() {
+    // Every stripe must be shut down even when an earlier stripe times out: a stuck transfer on
+    // one account must never leave the remaining 31 stripes running against a closing runtime.
+    // The first failure is rethrown (with the rest suppressed) so callers can still surface it.
+    Exception firstFailure = null;
     for (com.ghostchu.quickshop.addon.exchange.runtime.DrainingExecutor drain : drains) {
-      drain.close();
+      try {
+        drain.close();
+      } catch (Exception failure) {
+        if (firstFailure == null) {
+          firstFailure = failure;
+        } else {
+          firstFailure.addSuppressed(failure);
+        }
+      }
+    }
+    if (firstFailure != null) {
+      if (firstFailure instanceof RuntimeException runtime) {
+        throw runtime;
+      }
+      throw new IllegalStateException(
+          "failed to drain player operation serialiser", firstFailure);
     }
   }
 }
