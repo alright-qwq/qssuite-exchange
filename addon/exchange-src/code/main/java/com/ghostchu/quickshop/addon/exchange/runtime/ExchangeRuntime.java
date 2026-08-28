@@ -193,9 +193,37 @@ public final class ExchangeRuntime implements AutoCloseable {
   @Override
   public void close() throws Exception {
     acceptingWrites.set(false);
-    dispatcher.close();
-    afterDispatcherClosed.run();
-    writer.close();
+    // Every shutdown stage must run even when an earlier stage fails: a stuck dispatcher or a
+    // failed final drain must not keep the writer lock held forever, or the only recovery left
+    // would be a full server restart. The first failure is rethrown (with the rest suppressed)
+    // so callers can still surface and log the underlying problem.
+    Exception firstFailure = null;
+    try {
+      dispatcher.close();
+    } catch (Exception failure) {
+      firstFailure = failure;
+    }
+    try {
+      afterDispatcherClosed.run();
+    } catch (Exception failure) {
+      firstFailure = accumulate(firstFailure, failure);
+    }
+    try {
+      writer.close();
+    } catch (Exception failure) {
+      firstFailure = accumulate(firstFailure, failure);
+    }
+    if (firstFailure != null) {
+      throw firstFailure;
+    }
+  }
+
+  private static Exception accumulate(Exception first, Exception next) {
+    if (first == null) {
+      return next;
+    }
+    first.addSuppressed(next);
+    return first;
   }
 
   @FunctionalInterface

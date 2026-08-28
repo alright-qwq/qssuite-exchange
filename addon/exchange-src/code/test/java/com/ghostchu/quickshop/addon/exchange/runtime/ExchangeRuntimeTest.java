@@ -100,7 +100,7 @@ class ExchangeRuntimeTest {
   }
 
   @Test
-  void keepsWriterHeldWhenOperationalDrainFails() throws Exception {
+  void releasesWriterEvenWhenOperationalDrainFails() throws Exception {
     AtomicBoolean dispatcherClosed = new AtomicBoolean();
     TrackingGuard writer = new TrackingGuard(dispatcherClosed);
     ExchangeRuntime runtime = new ExchangeRuntime(writer, () -> {}, () -> {},
@@ -113,7 +113,24 @@ class ExchangeRuntimeTest {
         .hasMessageContaining("drain failed");
 
     assertThat(runtime.acceptingWrites()).isFalse();
-    assertThat(writer.held()).isTrue();
+    assertThat(writer.held()).isFalse();
+  }
+
+  @Test
+  void stillRunsPostDrainCleanupAndReleasesWriterWhenDispatcherCloseFails() throws Exception {
+    AtomicBoolean postDrainRan = new AtomicBoolean();
+    TrackingGuard writer = new TrackingGuard(new AtomicBoolean());
+    ExchangeRuntime runtime = new ExchangeRuntime(writer, () -> {}, () -> {},
+        () -> { throw new IllegalStateException("dispatcher close failed"); }, () -> {},
+        () -> postDrainRan.set(true));
+    runtime.start();
+
+    assertThatThrownBy(runtime::close)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("dispatcher close failed");
+
+    assertThat(postDrainRan).isTrue();
+    assertThat(writer.held()).isFalse();
   }
 
   @Test
